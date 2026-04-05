@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Healthcare Coordination Platform</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin-bottom: 30px; }
+        form { margin-bottom: 20px; }
+        input, button { margin: 5px; padding: 8px; }
+        #output { margin-top: 20px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Healthcare Coordination Platform</h1>
+
+    <div class="section">
+        <h2>User Authentication</h2>
+        <form id="loginForm">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <button id="logoutBtn">Logout</button>
+        <div id="authStatus"></div>
+    </div>
+
+    <div class="section">
+        <h2>Patients</h2>
+        <button id="loadPatients">Load Patients</button>
+        <form id="addPatientForm">
+            <input type="text" id="patientName" placeholder="Patient Name" required>
+            <input type="date" id="patientDob" required>
+            <button type="submit">Add Patient</button>
+        </form>
+        <div id="patientsList"></div>
+    </div>
+
+    <div class="section">
+        <h2>Appointments</h2>
+        <button id="loadAppointments">Load Appointments</button>
+        <form id="addAppointmentForm">
+            <input type="number" id="apptPatientId" placeholder="Patient ID" required>
+            <input type="date" id="apptDate" required>
+            <input type="time" id="apptTime" required>
+            <input type="text" id="apptNotes" placeholder="Notes">
+            <button type="submit">Add Appointment</button>
+        </form>
+        <div id="appointmentsList"></div>
+    </div>
+
+    <div class="section">
+        <h2>Medications</h2>
+        <button id="loadMedications">Load Medications</button>
+        <form id="addMedicationForm">
+            <input type="number" id="medPatientId" placeholder="Patient ID" required>
+            <input type="text" id="medName" placeholder="Medication Name" required>
+            <input type="text" id="medDosage" placeholder="Dosage" required>
+            <input type="text" id="medSchedule" placeholder="Schedule" required>
+            <input type="date" id="medStartDate" required>
+            <button type="submit">Add Medication</button>
+        </form>
+        <div id="medicationsList"></div>
+    </div>
+
+    <div class="section">
+        <h2>Notification Settings</h2>
+        <button id="loadSettings">Load Settings</button>
+        <form id="updateSettingsForm">
+            <label><input type="checkbox" id="emailAlerts"> Email Alerts</label>
+            <label><input type="checkbox" id="smsAlerts"> SMS Alerts</label>
+            <label><input type="checkbox" id="pushNotifications"> Push Notifications</label>
+            <button type="submit">Update Settings</button>
+        </form>
+        <div id="settingsDisplay"></div>
+    </div>
+
+    <div id="output"></div>
+
+    <script>
+        let token = localStorage.getItem('token');
+        const baseURL = 'http://127.0.0.1:8000/api';
+
+        function setAuthHeader() {
+            return token ? { 'Authorization': `Token ${token}` } : {};
+        }
+
+        function displayOutput(text) {
+            document.getElementById('output').textContent += text + '\n';
+        }
+
+        // Authentication
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            try {
+                const response = await fetch(`${baseURL}-token-auth/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                if (data.token) {
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    document.getElementById('authStatus').textContent = 'Logged in';
+                    displayOutput('Login successful');
+                } else {
+                    displayOutput('Login failed: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                displayOutput('Error: ' + error);
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            token = null;
+            localStorage.removeItem('token');
+            document.getElementById('authStatus').textContent = 'Logged out';
+            displayOutput('Logged out');
+        });
+
+        // Patients
+        document.getElementById('loadPatients').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/auth/patients/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                document.getElementById('patientsList').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                displayOutput('Error loading patients: ' + error);
+            }
+        });
+
+        document.getElementById('addPatientForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('patientName').value;
+            const date_of_birth = document.getElementById('patientDob').value;
+            try {
+                const response = await fetch(`${baseURL}/auth/patients/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify({ name, date_of_birth, caregivers: [] })
+                });
+                const data = await response.json();
+                displayOutput('Patient added: ' + JSON.stringify(data));
+                document.getElementById('loadPatients').click();
+            } catch (error) {
+                displayOutput('Error adding patient: ' + error);
+            }
+        });
+
+        // Appointments
+        document.getElementById('loadAppointments').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointments/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                document.getElementById('appointmentsList').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                displayOutput('Error loading appointments: ' + error);
+            }
+        });
+
+        document.getElementById('addAppointmentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const patient = document.getElementById('apptPatientId').value;
+            const date = document.getElementById('apptDate').value;
+            const time = document.getElementById('apptTime').value;
+            const notes = document.getElementById('apptNotes').value;
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointments/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify({ patient, caregiver: 1, date, time, notes })  // Assuming caregiver id 1
+                });
+                const data = await response.json();
+                displayOutput('Appointment added: ' + JSON.stringify(data));
+                document.getElementById('loadAppointments').click();
+            } catch (error) {
+                displayOutput('Error adding appointment: ' + error);
+            }
+        });
+
+        // Medications
+        document.getElementById('loadMedications').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/medications/medications/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                document.getElementById('medicationsList').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                displayOutput('Error loading medications: ' + error);
+            }
+        });
+
+        document.getElementById('addMedicationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const patient = document.getElementById('medPatientId').value;
+            const name = document.getElementById('medName').value;
+            const dosage = document.getElementById('medDosage').value;
+            const schedule = document.getElementById('medSchedule').value;
+            const start_date = document.getElementById('medStartDate').value;
+            try {
+                const response = await fetch(`${baseURL}/medications/medications/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify({ patient, name, dosage, schedule, start_date })
+                });
+                const data = await response.json();
+                displayOutput('Medication added: ' + JSON.stringify(data));
+                document.getElementById('loadMedications').click();
+            } catch (error) {
+                displayOutput('Error adding medication: ' + error);
+            }
+        });
+
+        // Notification Settings
+        document.getElementById('loadSettings').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/notifications/settings/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                document.getElementById('settingsDisplay').textContent = JSON.stringify(data, null, 2);
+                if (data.length > 0) {
+                    const settings = data[0];
+                    document.getElementById('emailAlerts').checked = settings.email_alerts;
+                    document.getElementById('smsAlerts').checked = settings.sms_alerts;
+                    document.getElementById('pushNotifications').checked = settings.push_notifications;
+                }
+            } catch (error) {
+                displayOutput('Error loading settings: ' + error);
+            }
+        });
+
+        document.getElementById('updateSettingsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email_alerts = document.getElementById('emailAlerts').checked;
+            const sms_alerts = document.getElementById('smsAlerts').checked;
+            const push_notifications = document.getElementById('pushNotifications').checked;
+            try {
+                const response = await fetch(`${baseURL}/notifications/settings/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify({ user: 1, email_alerts, sms_alerts, push_notifications })  // Assuming user id 1
+                });
+                const data = await response.json();
+                displayOutput('Settings updated: ' + JSON.stringify(data));
+                document.getElementById('loadSettings').click();
+            } catch (error) {
+                displayOutput('Error updating settings: ' + error);
+            }
+        });
+
+        // Initialize
+        if (token) {
+            document.getElementById('authStatus').textContent = 'Logged in';
+        }
+    </script>
+</body>
+</html>
