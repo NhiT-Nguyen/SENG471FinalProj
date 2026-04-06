@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
-from .models import Profile, Patient
+from .models import Profile, Patient, HealthcareProvider
 from django.contrib.auth import authenticate
 
 
@@ -123,6 +123,87 @@ class PatientRegistrationSerializer(serializers.Serializer):
         return patient
 
 
+class HealthcareProviderRegistrationSerializer(serializers.Serializer):
+    """Serializer for healthcare provider registration with professional data"""
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True, min_length=8)
+    license_number = serializers.CharField(max_length=50)
+    specialization = serializers.ChoiceField(choices=[
+        ('general_practice', 'General Practice'),
+        ('cardiology', 'Cardiology'),
+        ('neurology', 'Neurology'),
+        ('pediatrics', 'Pediatrics'),
+        ('orthopedics', 'Orthopedics'),
+        ('dermatology', 'Dermatology'),
+        ('psychiatry', 'Psychiatry'),
+        ('radiology', 'Radiology'),
+        ('emergency_medicine', 'Emergency Medicine'),
+        ('nursing', 'Nursing'),
+        ('pharmacy', 'Pharmacy'),
+        ('other', 'Other'),
+    ])
+    hospital_clinic = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    years_of_experience = serializers.IntegerField(min_value=0, default=0)
+
+    def validate(self, data):
+        """Validate healthcare provider registration data."""
+        if data.get('password') != data.get('password_confirm'):
+            raise serializers.ValidationError({'password': 'Passwords do not match.'})
+
+        if User.objects.filter(username=data.get('username')).exists():
+            raise serializers.ValidationError({'username': 'This username is already taken.'})
+
+        if User.objects.filter(email=data.get('email')).exists():
+            raise serializers.ValidationError({'email': 'This email is already registered.'})
+
+        if HealthcareProvider.objects.filter(license_number=data.get('license_number')).exists():
+            raise serializers.ValidationError({'license_number': 'This license number is already registered.'})
+
+        return data
+
+    def create(self, validated_data):
+        """Create a healthcare provider user account with professional profile data."""
+        password = validated_data.pop('password')
+        validated_data.pop('password_confirm')
+        license_number = validated_data.pop('license_number')
+        specialization = validated_data.pop('specialization')
+        hospital_clinic = validated_data.pop('hospital_clinic', '')
+        phone_number = validated_data.pop('phone_number', '')
+        years_of_experience = validated_data.pop('years_of_experience', 0)
+
+        # Create User account for healthcare provider
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            password=password
+        )
+
+        # Create Profile with healthcare_provider role
+        Profile.objects.create(user=user, role='healthcare_provider')
+
+        # Create HealthcareProvider record linked to the user
+        healthcare_provider = HealthcareProvider.objects.create(
+            user=user,
+            license_number=license_number,
+            specialization=specialization,
+            hospital_clinic=hospital_clinic,
+            phone_number=phone_number,
+            years_of_experience=years_of_experience
+        )
+
+        # Create token for the healthcare provider user
+        Token.objects.create(user=user)
+
+        return healthcare_provider
+
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
@@ -190,6 +271,17 @@ class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
         fields = ['id', 'name', 'date_of_birth', 'caregivers', 'family_members']
+
+
+class HealthcareProviderSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = HealthcareProvider
+        fields = ['id', 'user', 'license_number', 'specialization', 'specialization_display', 'hospital_clinic', 'phone_number', 'years_of_experience']
+
+    def get_specialization_display(self, obj):
+        return obj.get_specialization_display()
 
 
 class FamilyMemberSerializer(serializers.Serializer):

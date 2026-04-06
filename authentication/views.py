@@ -5,9 +5,10 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
-from .models import Profile, Patient
+from .models import Profile, Patient, HealthcareProvider
 from .serializers import (
     ProfileSerializer, PatientSerializer, RegistrationSerializer,
+    PatientRegistrationSerializer, HealthcareProviderRegistrationSerializer,
     LoginSerializer, UserSerializer, UpdateProfileSerializer, FamilyMemberSerializer
 )
 
@@ -98,6 +99,62 @@ class PatientRegistrationView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class HealthcareProviderRegistrationView(APIView):
+    """
+    API endpoint for healthcare provider account registration.
+    Allows healthcare providers to create their own accounts with professional data.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        """
+        Register a new healthcare provider account.
+        
+        Expected payload:
+        {
+            "username": "string",
+            "email": "string",
+            "first_name": "string",
+            "last_name": "string",
+            "password": "string",
+            "password_confirm": "string",
+            "license_number": "string",
+            "specialization": "general_practice|cardiology|neurology|...",
+            "hospital_clinic": "string (optional)",
+            "phone_number": "string (optional)",
+            "years_of_experience": integer (optional, default 0)
+        }
+        """
+        serializer = HealthcareProviderRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            healthcare_provider = serializer.save()
+            token = Token.objects.get(user=healthcare_provider.user)
+            return Response(
+                {
+                    'message': 'Healthcare provider account created successfully',
+                    'healthcare_provider': {
+                        'id': healthcare_provider.id,
+                        'license_number': healthcare_provider.license_number,
+                        'specialization': healthcare_provider.specialization,
+                        'specialization_display': healthcare_provider.get_specialization_display(),
+                        'hospital_clinic': healthcare_provider.hospital_clinic,
+                        'phone_number': healthcare_provider.phone_number,
+                        'years_of_experience': healthcare_provider.years_of_experience,
+                        'user': {
+                            'id': healthcare_provider.user.id,
+                            'username': healthcare_provider.user.username,
+                            'email': healthcare_provider.user.email,
+                            'first_name': healthcare_provider.user.first_name,
+                            'last_name': healthcare_provider.user.last_name
+                        }
+                    },
+                    'token': token.key
+                },
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class LoginView(APIView):
     """
     API endpoint for user login.
@@ -151,6 +208,22 @@ class LoginView(APIView):
                         'date_of_birth': patient.date_of_birth
                     }
                 except Patient.DoesNotExist:
+                    pass
+            
+            # Include healthcare provider data if user is a healthcare provider
+            if profile.role == 'healthcare_provider':
+                try:
+                    healthcare_provider = HealthcareProvider.objects.get(user=user)
+                    response_data['healthcare_provider'] = {
+                        'id': healthcare_provider.id,
+                        'license_number': healthcare_provider.license_number,
+                        'specialization': healthcare_provider.specialization,
+                        'specialization_display': healthcare_provider.get_specialization_display(),
+                        'hospital_clinic': healthcare_provider.hospital_clinic,
+                        'phone_number': healthcare_provider.phone_number,
+                        'years_of_experience': healthcare_provider.years_of_experience
+                    }
+                except HealthcareProvider.DoesNotExist:
                     pass
             
             return Response(response_data, status=status.HTTP_200_OK)
@@ -261,3 +334,55 @@ class PatientViewSet(viewsets.ModelViewSet):
         """Return all patients for which the current user is listed as a family member."""
         patients = Patient.objects.filter(family_members=request.user)
         return Response(PatientSerializer(patients, many=True).data, status=status.HTTP_200_OK)
+
+
+class HealthcareProviderViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing healthcare provider profiles.
+    Healthcare providers can view and update their own data.
+    Admin users can view all healthcare providers.
+    """
+    queryset = HealthcareProvider.objects.all()
+    serializer_class = HealthcareProviderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter healthcare providers based on user role."""
+        user = self.request.user
+        try:
+            profile = Profile.objects.get(user=user)
+            
+            # Healthcare providers can only see their own record
+            if profile.role == 'healthcare_provider':
+                return HealthcareProvider.objects.filter(user=user)
+            
+            # Admin/system users can see all healthcare providers
+            # (You may want to add admin role checking here)
+            return HealthcareProvider.objects.all()
+        except Profile.DoesNotExist:
+            return HealthcareProvider.objects.none()
+
+    @action(detail=False, methods=['get'])
+    def my_provider_data(self, request):
+        """Retrieve the current healthcare provider's own data."""
+        try:
+            profile = Profile.objects.get(user=request.user)
+            if profile.role != 'healthcare_provider':
+                return Response(
+                    {'error': 'This endpoint is only available for healthcare providers'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            healthcare_provider = HealthcareProvider.objects.get(user=request.user)
+            serializer = self.get_serializer(healthcare_provider)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Profile.DoesNotExist:
+            return Response(
+                {'error': 'Profile not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except HealthcareProvider.DoesNotExist:
+            return Response(
+                {'error': 'Healthcare provider data not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
