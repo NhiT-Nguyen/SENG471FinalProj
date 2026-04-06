@@ -97,6 +97,30 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ['user', 'role']
 
 
+class UpdateProfileSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False)
+    role = serializers.ChoiceField(choices=['caregiver', 'family_member', 'healthcare_provider'], required=False)
+
+    def validate_email(self, value):
+        user = self.context['request'].user
+        if User.objects.filter(email=value).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError('This email is already in use by another account.')
+        return value
+
+    def update(self, instance, validated_data):
+        user = instance.user
+        user.first_name = validated_data.get('first_name', user.first_name)
+        user.last_name = validated_data.get('last_name', user.last_name)
+        user.email = validated_data.get('email', user.email)
+        user.save()
+
+        instance.role = validated_data.get('role', instance.role)
+        instance.save()
+        return instance
+
+
 class PatientSerializer(serializers.ModelSerializer):
     caregivers = UserSerializer(many=True)
 
