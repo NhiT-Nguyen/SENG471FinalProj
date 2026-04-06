@@ -11,6 +11,14 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'first_name', 'last_name']
 
 
+class PatientDataSerializer(serializers.ModelSerializer):
+    """Serializer for patient-specific data"""
+    class Meta:
+        model = Patient
+        fields = ['id', 'name', 'date_of_birth']
+        read_only_fields = ['id']
+
+
 class RegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True, min_length=8)
@@ -32,7 +40,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'email': 'This email is already registered.'})
 
         role = data.get('role')
-        valid_roles = ['caregiver', 'family_member', 'healthcare_provider']
+        valid_roles = ['patient', 'caregiver', 'family_member', 'healthcare_provider']
         if role not in valid_roles:
             raise serializers.ValidationError({'role': f'Invalid role. Must be one of: {", ".join(valid_roles)}'})
 
@@ -41,7 +49,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create a new user and associated profile."""
         password = validated_data.pop('password')
-        password_confirm = validated_data.pop('password_confirm')
+        validated_data.pop('password_confirm')
         role = validated_data.pop('role')
 
         user = User.objects.create_user(
@@ -59,6 +67,60 @@ class RegistrationSerializer(serializers.ModelSerializer):
         Token.objects.create(user=user)
 
         return user
+
+
+class PatientRegistrationSerializer(serializers.Serializer):
+    """Serializer for patient registration with medical data"""
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=150, required=False)
+    last_name = serializers.CharField(max_length=150, required=False)
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True, min_length=8)
+    date_of_birth = serializers.DateField(required=True)
+
+    def validate(self, data):
+        """Validate patient registration data."""
+        if data.get('password') != data.get('password_confirm'):
+            raise serializers.ValidationError({'password': 'Passwords do not match.'})
+
+        if User.objects.filter(username=data.get('username')).exists():
+            raise serializers.ValidationError({'username': 'This username is already taken.'})
+
+        if User.objects.filter(email=data.get('email')).exists():
+            raise serializers.ValidationError({'email': 'This email is already registered.'})
+
+        return data
+
+    def create(self, validated_data):
+        """Create a patient user account with patient profile data."""
+        password = validated_data.pop('password')
+        validated_data.pop('password_confirm')
+        date_of_birth = validated_data.pop('date_of_birth')
+
+        # Create User account for patient
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            password=password
+        )
+
+        # Create Profile with patient role
+        Profile.objects.create(user=user, role='patient')
+
+        # Create Patient record linked to the user
+        patient = Patient.objects.create(
+            user=user,
+            name=f"{validated_data.get('first_name', '')} {validated_data.get('last_name', '')}".strip() or validated_data['username'],
+            date_of_birth=date_of_birth
+        )
+
+        # Create token for the patient user
+        Token.objects.create(user=user)
+
+        return patient
 
 
 class LoginSerializer(serializers.Serializer):
@@ -98,8 +160,9 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 
 class PatientSerializer(serializers.ModelSerializer):
-    caregivers = UserSerializer(many=True)
+    user = UserSerializer(read_only=True)
+    caregivers = UserSerializer(many=True, read_only=True)
 
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'caregivers']
+        fields = ['id', 'user', 'name', 'date_of_birth', 'caregivers']

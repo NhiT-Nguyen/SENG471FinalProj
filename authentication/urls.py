@@ -8,6 +8,7 @@ router.register(r'patients', views.PatientViewSet)
 
 urlpatterns = [
     path('register/', views.RegistrationView.as_view(), name='register'),
+    path('register/patient/', views.PatientRegistrationView.as_view(), name='patient_register'),
     path('login/', views.LoginView.as_view(), name='login'),
     path('', include(router.urls)),
 ]
