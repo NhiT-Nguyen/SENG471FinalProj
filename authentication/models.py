@@ -17,6 +17,7 @@ class Patient(models.Model):
     name = models.CharField(max_length=100)
     date_of_birth = models.DateField()
     caregivers = models.ManyToManyField(User, related_name='patients')
+    family_members = models.ManyToManyField(User, related_name='family_patients', blank=True)
 
     def __str__(self):
         return self.name
