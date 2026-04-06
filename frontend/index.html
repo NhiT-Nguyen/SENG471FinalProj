@@ -27,6 +27,25 @@
     </div>
 
     <div class="section">
+        <h2>User Profile</h2>
+        <button id="loadProfile">Load My Profile</button>
+        <div id="profileDisplay"></div>
+        <form id="updateProfileForm">
+            <input type="text" id="profileFirstName" placeholder="First Name">
+            <input type="text" id="profileLastName" placeholder="Last Name">
+            <input type="email" id="profileEmail" placeholder="Email">
+            <select id="profileRole">
+                <option value="">-- Select Role --</option>
+                <option value="caregiver">Caregiver</option>
+                <option value="family_member">Family Member</option>
+                <option value="healthcare_provider">Healthcare Provider</option>
+            </select>
+            <button type="submit">Update Profile</button>
+        </form>
+        <div id="profileUpdateStatus"></div>
+    </div>
+
+    <div class="section">
         <h2>Patients</h2>
         <button id="loadPatients">Load Patients</button>
         <form id="addPatientForm">
@@ -120,6 +139,54 @@
             localStorage.removeItem('token');
             document.getElementById('authStatus').textContent = 'Logged out';
             displayOutput('Logged out');
+        });
+
+        // User Profile
+        document.getElementById('loadProfile').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/auth/profiles/my_profile/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                document.getElementById('profileDisplay').textContent = JSON.stringify(data, null, 2);
+                if (data.user) {
+                    document.getElementById('profileFirstName').value = data.user.first_name || '';
+                    document.getElementById('profileLastName').value = data.user.last_name || '';
+                    document.getElementById('profileEmail').value = data.user.email || '';
+                    document.getElementById('profileRole').value = data.role || '';
+                }
+            } catch (error) {
+                displayOutput('Error loading profile: ' + error);
+            }
+        });
+
+        document.getElementById('updateProfileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {};
+            const firstName = document.getElementById('profileFirstName').value;
+            const lastName = document.getElementById('profileLastName').value;
+            const email = document.getElementById('profileEmail').value;
+            const role = document.getElementById('profileRole').value;
+            if (firstName) payload.first_name = firstName;
+            if (lastName) payload.last_name = lastName;
+            if (email) payload.email = email;
+            if (role) payload.role = role;
+            try {
+                const response = await fetch(`${baseURL}/auth/profiles/update_my_profile/`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('profileUpdateStatus').textContent = 'Profile updated successfully.';
+                    document.getElementById('profileDisplay').textContent = JSON.stringify(data, null, 2);
+                } else {
+                    document.getElementById('profileUpdateStatus').textContent = 'Error: ' + JSON.stringify(data);
+                }
+            } catch (error) {
+                displayOutput('Error updating profile: ' + error);
+            }
         });
 
         // Patients
