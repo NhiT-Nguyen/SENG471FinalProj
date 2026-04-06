@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from .models import Profile, Patient
 from .serializers import (
     ProfileSerializer, PatientSerializer, RegistrationSerializer,
-    LoginSerializer, UserSerializer
+    LoginSerializer, UserSerializer, UpdateProfileSerializer
 )
 
 
@@ -129,6 +129,26 @@ class ProfileViewSet(viewsets.ModelViewSet):
                 {'error': 'Profile not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+    @action(detail=False, methods=['patch', 'put'])
+    def update_my_profile(self, request):
+        """Update the current user's profile fields (first_name, last_name, email, role)."""
+        try:
+            profile = Profile.objects.get(user=request.user)
+        except Profile.DoesNotExist:
+            return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UpdateProfileSerializer(
+            profile,
+            data=request.data,
+            partial=request.method == 'PATCH',
+            context={'request': request}
+        )
+        if serializer.is_valid():
+            serializer.update(profile, serializer.validated_data)
+            updated_profile = Profile.objects.get(user=request.user)
+            return Response(ProfileSerializer(updated_profile).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class PatientViewSet(viewsets.ModelViewSet):
