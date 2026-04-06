@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from .models import Profile, Patient
 from .serializers import (
     ProfileSerializer, PatientSerializer, RegistrationSerializer,
-    LoginSerializer, UserSerializer, UpdateProfileSerializer
+    LoginSerializer, UserSerializer, UpdateProfileSerializer, FamilyMemberSerializer
 )
 
 
@@ -158,3 +158,43 @@ class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated]
+
+    @action(detail=True, methods=['post'])
+    def add_family_member(self, request, pk=None):
+        """Add a family_member-role user to a patient's family_members list."""
+        patient = self.get_object()
+        serializer = FamilyMemberSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.get(username=serializer.validated_data['username'])
+        if patient.family_members.filter(pk=user.pk).exists():
+            return Response(
+                {'detail': f'{user.username} is already a family member of this patient.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        patient.family_members.add(user)
+        return Response(PatientSerializer(patient).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def remove_family_member(self, request, pk=None):
+        """Remove a user from a patient's family_members list."""
+        patient = self.get_object()
+        serializer = FamilyMemberSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.get(username=serializer.validated_data['username'])
+        if not patient.family_members.filter(pk=user.pk).exists():
+            return Response(
+                {'detail': f'{user.username} is not a family member of this patient.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        patient.family_members.remove(user)
+        return Response(PatientSerializer(patient).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'])
+    def my_family_patients(self, request):
+        """Return all patients for which the current user is listed as a family member."""
+        patients = Patient.objects.filter(family_members=request.user)
+        return Response(PatientSerializer(patients, many=True).data, status=status.HTTP_200_OK)

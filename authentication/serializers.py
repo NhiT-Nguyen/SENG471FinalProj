@@ -122,8 +122,28 @@ class UpdateProfileSerializer(serializers.Serializer):
 
 
 class PatientSerializer(serializers.ModelSerializer):
-    caregivers = UserSerializer(many=True)
+    caregivers = UserSerializer(many=True, read_only=True)
+    family_members = UserSerializer(many=True, read_only=True)
 
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'caregivers']
+        fields = ['id', 'name', 'date_of_birth', 'caregivers', 'family_members']
+
+
+class FamilyMemberSerializer(serializers.Serializer):
+    username = serializers.CharField()
+
+    def validate_username(self, value):
+        try:
+            user = User.objects.get(username=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(f'No user found with username "{value}".')
+        try:
+            profile = user.profile
+        except Exception:
+            raise serializers.ValidationError('That user does not have a profile.')
+        if profile.role != 'family_member':
+            raise serializers.ValidationError(
+                f'User "{value}" has role "{profile.role}". Only users with role "family_member" can be added.'
+            )
+        return value
