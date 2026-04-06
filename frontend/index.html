@@ -27,6 +27,25 @@
     </div>
 
     <div class="section">
+        <h2>User Profile</h2>
+        <button id="loadProfile">Load My Profile</button>
+        <div id="profileDisplay"></div>
+        <form id="updateProfileForm">
+            <input type="text" id="profileFirstName" placeholder="First Name">
+            <input type="text" id="profileLastName" placeholder="Last Name">
+            <input type="email" id="profileEmail" placeholder="Email">
+            <select id="profileRole">
+                <option value="">-- Select Role --</option>
+                <option value="caregiver">Caregiver</option>
+                <option value="family_member">Family Member</option>
+                <option value="healthcare_provider">Healthcare Provider</option>
+            </select>
+            <button type="submit">Update Profile</button>
+        </form>
+        <div id="profileUpdateStatus"></div>
+    </div>
+
+    <div class="section">
         <h2>Patients</h2>
         <button id="loadPatients">Load Patients</button>
         <form id="addPatientForm">
@@ -62,6 +81,31 @@
             <button type="submit">Add Medication</button>
         </form>
         <div id="medicationsList"></div>
+    </div>
+
+    <div class="section">
+        <h2>Family Member Access</h2>
+        <p>Grant a family member access to view a patient's appointments and records.</p>
+
+        <h3>Add Family Member to Patient</h3>
+        <form id="addFamilyMemberForm">
+            <input type="number" id="fmPatientId" placeholder="Patient ID" required>
+            <input type="text" id="fmUsername" placeholder="Family Member Username" required>
+            <button type="submit">Add Family Member</button>
+        </form>
+        <div id="addFamilyMemberStatus"></div>
+
+        <h3>Remove Family Member from Patient</h3>
+        <form id="removeFamilyMemberForm">
+            <input type="number" id="rmPatientId" placeholder="Patient ID" required>
+            <input type="text" id="rmUsername" placeholder="Family Member Username" required>
+            <button type="submit">Remove Family Member</button>
+        </form>
+        <div id="removeFamilyMemberStatus"></div>
+
+        <h3>My Patients (as Family Member)</h3>
+        <button id="loadFamilyPatients">Load My Family Patients</button>
+        <div id="familyPatientsList"></div>
     </div>
 
     <div class="section">
@@ -120,6 +164,54 @@
             localStorage.removeItem('token');
             document.getElementById('authStatus').textContent = 'Logged out';
             displayOutput('Logged out');
+        });
+
+        // User Profile
+        document.getElementById('loadProfile').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/auth/profiles/my_profile/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                document.getElementById('profileDisplay').textContent = JSON.stringify(data, null, 2);
+                if (data.user) {
+                    document.getElementById('profileFirstName').value = data.user.first_name || '';
+                    document.getElementById('profileLastName').value = data.user.last_name || '';
+                    document.getElementById('profileEmail').value = data.user.email || '';
+                    document.getElementById('profileRole').value = data.role || '';
+                }
+            } catch (error) {
+                displayOutput('Error loading profile: ' + error);
+            }
+        });
+
+        document.getElementById('updateProfileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {};
+            const firstName = document.getElementById('profileFirstName').value;
+            const lastName = document.getElementById('profileLastName').value;
+            const email = document.getElementById('profileEmail').value;
+            const role = document.getElementById('profileRole').value;
+            if (firstName) payload.first_name = firstName;
+            if (lastName) payload.last_name = lastName;
+            if (email) payload.email = email;
+            if (role) payload.role = role;
+            try {
+                const response = await fetch(`${baseURL}/auth/profiles/update_my_profile/`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('profileUpdateStatus').textContent = 'Profile updated successfully.';
+                    document.getElementById('profileDisplay').textContent = JSON.stringify(data, null, 2);
+                } else {
+                    document.getElementById('profileUpdateStatus').textContent = 'Error: ' + JSON.stringify(data);
+                }
+            } catch (error) {
+                displayOutput('Error updating profile: ' + error);
+            }
         });
 
         // Patients
@@ -217,6 +309,63 @@
                 document.getElementById('loadMedications').click();
             } catch (error) {
                 displayOutput('Error adding medication: ' + error);
+            }
+        });
+
+        // Family Member Access
+        document.getElementById('addFamilyMemberForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const patientId = document.getElementById('fmPatientId').value;
+            const username = document.getElementById('fmUsername').value;
+            try {
+                const response = await fetch(`${baseURL}/auth/patients/${patientId}/add_family_member/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify({ username })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('addFamilyMemberStatus').textContent =
+                        `Added ${username} as family member. Family members: ${data.family_members.map(u => u.username).join(', ')}`;
+                } else {
+                    document.getElementById('addFamilyMemberStatus').textContent = 'Error: ' + JSON.stringify(data);
+                }
+            } catch (error) {
+                displayOutput('Error adding family member: ' + error);
+            }
+        });
+
+        document.getElementById('removeFamilyMemberForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const patientId = document.getElementById('rmPatientId').value;
+            const username = document.getElementById('rmUsername').value;
+            try {
+                const response = await fetch(`${baseURL}/auth/patients/${patientId}/remove_family_member/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify({ username })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('removeFamilyMemberStatus').textContent =
+                        `Removed ${username}. Remaining family members: ${data.family_members.map(u => u.username).join(', ') || 'none'}`;
+                } else {
+                    document.getElementById('removeFamilyMemberStatus').textContent = 'Error: ' + JSON.stringify(data);
+                }
+            } catch (error) {
+                displayOutput('Error removing family member: ' + error);
+            }
+        });
+
+        document.getElementById('loadFamilyPatients').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/auth/patients/my_family_patients/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                document.getElementById('familyPatientsList').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                displayOutput('Error loading family patients: ' + error);
             }
         });
 

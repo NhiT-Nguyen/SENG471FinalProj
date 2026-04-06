@@ -8,8 +8,7 @@ from django.contrib.auth.models import User
 from .models import Profile, Patient
 from .serializers import (
     ProfileSerializer, PatientSerializer, RegistrationSerializer,
-    PatientRegistrationSerializer, LoginSerializer, UserSerializer,
-    PatientDataSerializer
+    LoginSerializer, UserSerializer, UpdateProfileSerializer, FamilyMemberSerializer
 )
 
 
@@ -192,6 +191,26 @@ class ProfileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+    @action(detail=False, methods=['patch', 'put'])
+    def update_my_profile(self, request):
+        """Update the current user's profile fields (first_name, last_name, email, role)."""
+        try:
+            profile = Profile.objects.get(user=request.user)
+        except Profile.DoesNotExist:
+            return Response({'error': 'Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UpdateProfileSerializer(
+            profile,
+            data=request.data,
+            partial=request.method == 'PATCH',
+            context={'request': request}
+        )
+        if serializer.is_valid():
+            serializer.update(profile, serializer.validated_data)
+            updated_profile = Profile.objects.get(user=request.user)
+            return Response(ProfileSerializer(updated_profile).data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class PatientViewSet(viewsets.ModelViewSet):
     """
@@ -203,51 +222,42 @@ class PatientViewSet(viewsets.ModelViewSet):
     serializer_class = PatientSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        """Filter patients based on user role."""
-        user = self.request.user
-        try:
-            profile = Profile.objects.get(user=user)
-            
-            # Patients can only see their own record
-            if profile.role == 'patient':
-                return Patient.objects.filter(user=user)
-            
-            # Caregivers can see patients they manage
-            elif profile.role == 'caregiver':
-                return Patient.objects.filter(caregivers_managed=user)
-            
-            # Healthcare providers can see all patients
-            elif profile.role == 'healthcare_provider':
-                return Patient.objects.all()
-            
-            # Family members can see patients they manage
-            elif profile.role == 'family_member':
-                return Patient.objects.filter(caregivers_managed=user)
-        except Profile.DoesNotExist:
-            return Patient.objects.none()
+    @action(detail=True, methods=['post'])
+    def add_family_member(self, request, pk=None):
+        """Add a family_member-role user to a patient's family_members list."""
+        patient = self.get_object()
+        serializer = FamilyMemberSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.get(username=serializer.validated_data['username'])
+        if patient.family_members.filter(pk=user.pk).exists():
+            return Response(
+                {'detail': f'{user.username} is already a family member of this patient.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        patient.family_members.add(user)
+        return Response(PatientSerializer(patient).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def remove_family_member(self, request, pk=None):
+        """Remove a user from a patient's family_members list."""
+        patient = self.get_object()
+        serializer = FamilyMemberSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.get(username=serializer.validated_data['username'])
+        if not patient.family_members.filter(pk=user.pk).exists():
+            return Response(
+                {'detail': f'{user.username} is not a family member of this patient.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        patient.family_members.remove(user)
+        return Response(PatientSerializer(patient).data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'])
-    def my_patient_data(self, request):
-        """Retrieve the current patient's own data (for patients only)."""
-        try:
-            profile = Profile.objects.get(user=request.user)
-            if profile.role != 'patient':
-                return Response(
-                    {'error': 'This endpoint is only available for patients'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            patient = Patient.objects.get(user=request.user)
-            serializer = self.get_serializer(patient)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        except Profile.DoesNotExist:
-            return Response(
-                {'error': 'Profile not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Patient.DoesNotExist:
-            return Response(
-                {'error': 'Patient data not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+    def my_family_patients(self, request):
+        """Return all patients for which the current user is listed as a family member."""
+        patients = Patient.objects.filter(family_members=request.user)
+        return Response(PatientSerializer(patients, many=True).data, status=status.HTTP_200_OK)
