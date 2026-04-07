@@ -65,6 +65,13 @@ class AppointmentRequest(models.Model):
         ('pending', 'Pending'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
+        ('cancelled', 'Cancelled'),
+    ]
+    CHANGE_STATUS_CHOICES = [
+        ('none', 'None'),
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
     ]
     
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='appointment_requests')
@@ -74,7 +81,15 @@ class AppointmentRequest(models.Model):
     requested_end_time = models.TimeField()
     notes = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    appointment = models.OneToOneField('Appointment', null=True, blank=True, on_delete=models.SET_NULL, related_name='appointment_request')
+    proposed_date = models.DateField(null=True, blank=True)
+    proposed_start_time = models.TimeField(null=True, blank=True)
+    proposed_end_time = models.TimeField(null=True, blank=True)
+    proposed_notes = models.TextField(blank=True)
+    change_status = models.CharField(max_length=20, choices=CHANGE_STATUS_CHOICES, default='none')
+    change_requested_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
     
     def __str__(self):

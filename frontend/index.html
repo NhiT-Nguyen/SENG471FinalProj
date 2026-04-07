@@ -111,8 +111,12 @@
         <p>Click "View Full Availability" on a provider to select a specific time slot and request an appointment.</p>
         <div id="providerAvailabilitySlots" style="margin-top: 20px;"></div>
         <form id="appointmentRequestForm" style="display: none;">
+            <input type="hidden" id="editRequestId">
             <input type="hidden" id="requestProviderId">
-            <input type="hidden" id="requestPatientId">
+            <label>
+                Patient ID:
+                <input type="number" id="requestPatientId" placeholder="Patient ID" required>
+            </label>
             <input type="hidden" id="requestDate">
             <input type="hidden" id="requestStartTime">
             <input type="hidden" id="requestEndTime">
@@ -120,17 +124,25 @@
             <p>Date: <strong id="requestDateDisplay"></strong></p>
             <p>Time: <strong id="requestTimeDisplay"></strong></p>
             <textarea id="requestNotes" placeholder="Add notes about your appointment request (optional)" rows="4" style="width: 100%; margin: 10px 0;"></textarea>
-            <button type="submit" style="background: #28a745; color: white; border: none; cursor: pointer; padding: 10px;">Submit Appointment Request</button>
+            <button type="submit" id="submitRequestBtn" style="background: #28a745; color: white; border: none; cursor: pointer; padding: 10px;">Submit Appointment Request</button>
             <button type="button" id="cancelRequestBtn" style="background: #999; color: white; border: none; cursor: pointer; padding: 10px; margin-left: 5px;">Cancel</button>
         </form>
         <div id="requestStatus"></div>
     </div>
 
     <div class="section">
+        <h2>My Appointment Requests</h2>
+        <button id="loadMyRequests">Load My Requests</button>
+        <div id="myRequestsList"></div>
+    </div>
+
+    <div class="section">
         <h2>Manage Appointment Requests (Healthcare Provider)</h2>
         <p>Review and approve or reject appointment requests from patients and family members.</p>
         <button id="loadPendingRequests">Load Pending Requests</button>
+        <button id="loadPendingChangeRequests">Load Pending Change Requests</button>
         <div id="pendingRequestsList"></div>
+        <div id="pendingChangeRequestsList" style="margin-top: 20px;"></div>
     </div>
 
     <div class="section">
@@ -495,6 +507,7 @@
         // Appointment Request
         document.getElementById('appointmentRequestForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const editRequestId = document.getElementById('editRequestId').value;
             const patient = document.getElementById('requestPatientId').value;
             const healthcare_provider = document.getElementById('requestProviderId').value;
             const requested_date = document.getElementById('requestDate').value;
@@ -508,24 +521,48 @@
             }
 
             try {
-                const response = await fetch(`${baseURL}/appointments/appointment-requests/request-appointment/`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
-                    body: JSON.stringify({
-                        patient,
-                        healthcare_provider,
-                        requested_date,
-                        requested_start_time,
-                        requested_end_time,
-                        notes
-                    })
-                });
+                let response;
+                if (editRequestId) {
+                    response = await fetch(`${baseURL}/appointments/appointment-requests/${editRequestId}/`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                        body: JSON.stringify({
+                            requested_date,
+                            requested_start_time,
+                            requested_end_time,
+                            notes
+                        })
+                    });
+                } else {
+                    response = await fetch(`${baseURL}/appointments/appointment-requests/request-appointment/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                        body: JSON.stringify({
+                            patient,
+                            healthcare_provider,
+                            requested_date,
+                            requested_start_time,
+                            requested_end_time,
+                            notes
+                        })
+                    });
+                }
+
                 const data = await response.json();
                 if (response.ok) {
-                    document.getElementById('requestStatus').textContent = 'Appointment request submitted successfully! Status: ' + data.status;
+                    if (editRequestId) {
+                        document.getElementById('requestStatus').textContent = 'Appointment request changes submitted and awaiting provider approval.';
+                    } else {
+                        document.getElementById('requestStatus').textContent = 'Appointment request submitted successfully! Status: ' + data.status;
+                    }
                     document.getElementById('appointmentRequestForm').style.display = 'none';
                     document.getElementById('requestNotes').value = '';
+                    document.getElementById('editRequestId').value = '';
+                    document.getElementById('requestProviderId').value = '';
+                    document.getElementById('requestPatientId').value = '';
+                    document.getElementById('submitRequestBtn').textContent = 'Submit Appointment Request';
                     document.getElementById('providerAvailabilitySlots').innerHTML = '<p><strong>Your appointment request has been submitted. The healthcare provider will review it and contact you with their response.</strong></p>';
+                    document.getElementById('myRequestsList').textContent = '';
                 } else {
                     document.getElementById('requestStatus').textContent = 'Error: ' + JSON.stringify(data);
                 }
@@ -538,7 +575,98 @@
             document.getElementById('appointmentRequestForm').style.display = 'none';
             document.getElementById('requestNotes').value = '';
             document.getElementById('requestStatus').textContent = '';
+            document.getElementById('editRequestId').value = '';
+            document.getElementById('requestProviderId').value = '';
+            document.getElementById('requestPatientId').value = '';
+            document.getElementById('submitRequestBtn').textContent = 'Submit Appointment Request';
         });
+
+        document.getElementById('loadMyRequests').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/my_requests/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+
+                let html = '<h3>My Appointment Requests</h3>';
+                if (!Array.isArray(data) || data.length === 0) {
+                    html += '<p>No appointment requests found.</p>';
+                } else {
+                    html += '<ul style="list-style: none; padding: 0;">';
+                    data.forEach(request => {
+                        const showChangeTitle = request.status === 'approved' && request.change_status === 'pending';
+                        html += `
+                            <li style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px;">
+                                <strong>Provider:</strong> ${request.provider_name}<br>
+                                <strong>Date:</strong> ${request.requested_date}<br>
+                                <strong>Time:</strong> ${request.requested_start_time} - ${request.requested_end_time}<br>
+                                <strong>Notes:</strong> ${request.notes || 'None'}<br>
+                                <strong>Status:</strong> ${request.status_display}<br>
+                                <strong>Change Status:</strong> ${request.change_status_display || 'None'}<br>
+                        `;
+                        if (request.status === 'pending' || (request.status === 'approved' && request.change_status === 'none')) {
+                            html += `<button onclick="editMyRequest(${request.id})" style="background: #007bff; color: white; border: none; cursor: pointer; padding: 5px 10px; margin-top: 5px;">Edit Request</button>`;
+                        }
+                        if (request.status === 'pending') {
+                            html += `<button onclick="cancelMyRequest(${request.id})" style="background: #dc3545; color: white; border: none; cursor: pointer; padding: 5px 10px; margin-top: 5px; margin-left: 5px;">Cancel Request</button>`;
+                        }
+                        if (showChangeTitle) {
+                            html += '<p><em>A requested change is pending provider review.</em></p>';
+                        }
+                        html += '</li>';
+                    });
+                    html += '</ul>';
+                }
+                document.getElementById('myRequestsList').innerHTML = html;
+            } catch (error) {
+                displayOutput('Error loading my requests: ' + error);
+            }
+        });
+
+        window.editMyRequest = async function(requestId) {
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/${requestId}/`, {
+                    headers: setAuthHeader()
+                });
+                const request = await response.json();
+                document.getElementById('editRequestId').value = requestId;
+                document.getElementById('requestProviderId').value = request.healthcare_provider;
+                document.getElementById('requestPatientId').value = request.patient;
+                document.getElementById('requestDate').value = request.requested_date;
+                document.getElementById('requestStartTime').value = request.requested_start_time;
+                document.getElementById('requestEndTime').value = request.requested_end_time;
+                document.getElementById('requestNotes').value = request.notes || '';
+                document.getElementById('requestProviderName').textContent = `Editing request for ${request.provider_name}`;
+                document.getElementById('requestDateDisplay').textContent = request.requested_date;
+                document.getElementById('requestTimeDisplay').textContent = `${request.requested_start_time} - ${request.requested_end_time}`;
+                document.getElementById('submitRequestBtn').textContent = 'Submit Request Changes';
+                document.getElementById('appointmentRequestForm').style.display = 'block';
+                document.getElementById('appointmentRequestForm').scrollIntoView({behavior: 'smooth'});
+            } catch (error) {
+                displayOutput('Error loading request for edit: ' + error);
+            }
+        };
+
+        window.cancelMyRequest = async function(requestId) {
+            if (!confirm('Are you sure you want to cancel this appointment request?')) {
+                return;
+            }
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/${requestId}/cancel/`, {
+                    method: 'POST',
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    displayOutput('Appointment request cancelled.');
+                    document.getElementById('loadMyRequests').click();
+                } else {
+                    displayOutput('Error: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                displayOutput('Error cancelling request: ' + error);
+            }
+        };
 
         // Manage Appointment Requests (Healthcare Provider)
         document.getElementById('loadPendingRequests').addEventListener('click', async () => {
@@ -629,6 +757,89 @@
                 } catch (error) {
                     displayOutput('Error rejecting request: ' + error);
                 }
+            }
+        };
+
+        document.getElementById('loadPendingChangeRequests').addEventListener('click', async () => {
+            try {
+                const profileResponse = await fetch(`${baseURL}/auth/profiles/`, {
+                    headers: setAuthHeader()
+                });
+                const profiles = await profileResponse.json();
+                let currentProviderId = null;
+                for (let profile of profiles) {
+                    if (profile.role === 'healthcare_provider') {
+                        currentProviderId = profile.user.id;
+                        break;
+                    }
+                }
+                if (!currentProviderId) {
+                    document.getElementById('pendingChangeRequestsList').innerHTML = '<p>You are not a healthcare provider or your profile could not be found.</p>';
+                    return;
+                }
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/pending-change-requests/?provider_id=${currentProviderId}`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                let html = '<h3>Pending Change Requests</h3>';
+                if (!Array.isArray(data) || data.length === 0) {
+                    html += '<p>No pending change requests.</p>';
+                } else {
+                    html += '<ul style="list-style: none; padding: 0;">';
+                    data.forEach(request => {
+                        html += `
+                            <li style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px;">
+                                <strong>Provider:</strong> ${request.provider_name}<br>
+                                <strong>Patient:</strong> ${request.patient_name}<br>
+                                <strong>Current Appointment:</strong> ${request.requested_date} ${request.requested_start_time} - ${request.requested_end_time}<br>
+                                <strong>Proposed Date/Time:</strong> ${request.proposed_date} ${request.proposed_start_time} - ${request.proposed_end_time}<br>
+                                <strong>Proposed Notes:</strong> ${request.proposed_notes || 'None'}<br>
+                                <button onclick="acceptAppointmentChange(${request.id})" style="background: #28a745; color: white; border: none; cursor: pointer; padding: 5px 10px; margin-top: 5px;">Accept Changes</button>
+                                <button onclick="declineAppointmentChange(${request.id})" style="background: #dc3545; color: white; border: none; cursor: pointer; padding: 5px 10px; margin-top: 5px; margin-left: 5px;">Decline Changes</button>
+                            </li>
+                        `;
+                    });
+                    html += '</ul>';
+                }
+                document.getElementById('pendingChangeRequestsList').innerHTML = html;
+            } catch (error) {
+                displayOutput('Error loading pending change requests: ' + error);
+            }
+        });
+
+        window.acceptAppointmentChange = async function(requestId) {
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/${requestId}/accept_changes/`, {
+                    method: 'POST',
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    displayOutput('Appointment change accepted.');
+                    document.getElementById('loadPendingChangeRequests').click();
+                } else {
+                    displayOutput('Error: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                displayOutput('Error accepting request changes: ' + error);
+            }
+        };
+
+        window.declineAppointmentChange = async function(requestId) {
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/${requestId}/decline_changes/`, {
+                    method: 'POST',
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    displayOutput('Appointment change declined.');
+                    document.getElementById('loadPendingChangeRequests').click();
+                } else {
+                    displayOutput('Error: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                displayOutput('Error declining request changes: ' + error);
             }
         };
 
