@@ -16,6 +16,12 @@
         #providerSearchResults strong { color: #333; }
         #providerSearchResults button { background: #007bff; color: white; border: none; cursor: pointer; }
         #providerSearchResults button:hover { background: #0056b3; }
+        .auth-forms { display: flex; flex-wrap: wrap; gap: 20px; }
+        .auth-panel { flex: 1 1 300px; border: 1px solid #ccc; border-radius: 8px; padding: 15px; background: #fafafa; }
+        .auth-panel h3 { margin-top: 0; }
+        .auth-panel input, .auth-panel select, .auth-panel button { width: calc(100% - 18px); display: block; margin: 8px 0; }
+        .auth-status { margin-top: 10px; font-size: 0.95rem; color: #333; }
+        #authStatus { margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -23,13 +29,38 @@
 
     <div class="section">
         <h2>User Authentication</h2>
-        <form id="loginForm">
-            <input type="text" id="username" placeholder="Username" required>
-            <input type="password" id="password" placeholder="Password" required>
-            <button type="submit">Login</button>
-        </form>
+        <div class="auth-forms">
+            <div class="auth-panel">
+                <h3>Login</h3>
+                <form id="loginForm">
+                    <input type="text" id="loginUsername" placeholder="Username" required>
+                    <input type="password" id="loginPassword" placeholder="Password" required>
+                    <button type="submit">Login</button>
+                </form>
+                <div id="loginStatus" class="auth-status"></div>
+            </div>
+            <div class="auth-panel">
+                <h3>Register</h3>
+                <form id="registerForm">
+                    <input type="text" id="registerUsername" placeholder="Username" required>
+                    <input type="email" id="registerEmail" placeholder="Email" required>
+                    <input type="text" id="registerFirstName" placeholder="First Name" required>
+                    <input type="text" id="registerLastName" placeholder="Last Name" required>
+                    <input type="password" id="registerPassword" placeholder="Password" required>
+                    <input type="password" id="registerPasswordConfirm" placeholder="Confirm Password" required>
+                    <select id="registerRole" required>
+                        <option value="">Select Role</option>
+                        <option value="caregiver">Caregiver</option>
+                        <option value="family_member">Family Member</option>
+                        <option value="healthcare_provider">Healthcare Provider</option>
+                    </select>
+                    <button type="submit">Register</button>
+                </form>
+                <div id="registerStatus" class="auth-status"></div>
+            </div>
+        </div>
         <button id="logoutBtn">Logout</button>
-        <div id="authStatus"></div>
+        <div id="authStatus">Not logged in</div>
     </div>
 
     <div class="section">
@@ -258,7 +289,9 @@
 
     <script>
         let token = localStorage.getItem('token');
-        const baseURL = 'http://127.0.0.1:8000/api';
+        const apiHost = 'http://127.0.0.1:8000';
+        const baseURL = `${apiHost}/api`;
+        const authBase = `${apiHost}/api/auth`;
         let currentUser = null;
         let currentUserRole = '';
         let currentProviderId = null;
@@ -273,33 +306,99 @@
             if (currentUserRole === 'healthcare_provider' && currentUser) {
                 currentProviderId = currentUser.id;
             }
+            if (currentUser) {
+                document.getElementById('authStatus').textContent = `Logged in as ${currentUser.username} (${currentUserRole})`;
+            }
         }
 
         function displayOutput(text) {
             document.getElementById('output').textContent += text + '\n';
         }
 
-        // Authentication
+        async function performLogin(username, password) {
+            const endpoints = [`${authBase}/login/`, `${apiHost}/api-token-auth/`];
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    const data = await response.json().catch(() => ({ error: 'Invalid JSON response' }));
+                    if (response.ok && data.token) {
+                        return { ok: true, data };
+                    }
+                    if (response.status === 404 && endpoint === `${authBase}/login/`) {
+                        continue;
+                    }
+                    return { ok: false, data, status: response.status };
+                } catch (error) {
+                    if (endpoint === `${authBase}/login/`) {
+                        continue;
+                    }
+                    return { ok: false, error };
+                }
+            }
+            return { ok: false, data: { error: 'Login endpoint unavailable' }, status: 404 };
+        }
+
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            document.getElementById('loginStatus').textContent = 'Logging in...';
+            const result = await performLogin(username, password);
+            if (result.ok) {
+                token = result.data.token;
+                localStorage.setItem('token', token);
+                document.getElementById('loginStatus').textContent = 'Login successful';
+                document.getElementById('authStatus').textContent = `Logged in as ${username}`;
+                displayOutput('Login successful');
+            } else {
+                document.getElementById('loginStatus').textContent = 'Login failed: ' + JSON.stringify(result.data || result.error);
+                displayOutput('Login failed: ' + JSON.stringify(result.data || result.error));
+            }
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {
+                username: document.getElementById('registerUsername').value.trim(),
+                email: document.getElementById('registerEmail').value.trim(),
+                first_name: document.getElementById('registerFirstName').value.trim(),
+                last_name: document.getElementById('registerLastName').value.trim(),
+                password: document.getElementById('registerPassword').value,
+                password_confirm: document.getElementById('registerPasswordConfirm').value,
+                role: document.getElementById('registerRole').value
+            };
+
+            if (payload.password !== payload.password_confirm) {
+                document.getElementById('registerStatus').textContent = 'Passwords do not match.';
+                return;
+            }
+
+            document.getElementById('registerStatus').textContent = 'Registering...';
             try {
-                const response = await fetch(`${baseURL}-token-auth/`, {
+                const response = await fetch(`${authBase}/register/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify(payload)
                 });
                 const data = await response.json();
-                if (data.token) {
-                    token = data.token;
-                    localStorage.setItem('token', token);
-                    document.getElementById('authStatus').textContent = 'Logged in';
-                    displayOutput('Login successful');
+                if (response.ok) {
+                    document.getElementById('registerStatus').textContent = 'Registration successful. You can now log in.';
+                    displayOutput('Registration successful: ' + JSON.stringify(data));
+                    if (data.token) {
+                        token = data.token;
+                        localStorage.setItem('token', token);
+                        document.getElementById('authStatus').textContent = `Logged in as ${payload.username}`;
+                    }
                 } else {
-                    displayOutput('Login failed: ' + JSON.stringify(data));
+                    document.getElementById('registerStatus').textContent = 'Registration failed: ' + JSON.stringify(data);
+                    displayOutput('Registration failed: ' + JSON.stringify(data));
                 }
             } catch (error) {
+                document.getElementById('registerStatus').textContent = 'Error: ' + error;
                 displayOutput('Error: ' + error);
             }
         });
@@ -308,6 +407,7 @@
             token = null;
             localStorage.removeItem('token');
             document.getElementById('authStatus').textContent = 'Logged out';
+            document.getElementById('loginStatus').textContent = '';
             displayOutput('Logged out');
         });
 
