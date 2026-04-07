@@ -5,7 +5,11 @@ from authentication.serializers import HealthcareProviderDetailSerializer
 class AppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
-        fields = ['id', 'patient', 'healthcare_provider', 'date', 'time', 'duration', 'notes', 'location']
+        fields = [
+            'id', 'patient', 'healthcare_provider', 'date', 'time', 'duration',
+            'notes', 'reasons_for_visit', 'examinations_performed', 'tests_requested',
+            'new_medications', 'referrals', 'follow_up_recommended', 'location'
+        ]
 
 class AvailabilitySerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)

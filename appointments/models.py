@@ -9,7 +9,13 @@ class Appointment(models.Model):
     date = models.DateField()
     time = models.TimeField()
     duration = models.DurationField(default=timedelta(hours=1))
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, default='')
+    reasons_for_visit = models.TextField(blank=True, default='')
+    examinations_performed = models.TextField(blank=True, default='')
+    tests_requested = models.TextField(blank=True, default='')
+    new_medications = models.TextField(blank=True, default='')
+    referrals = models.TextField(blank=True, default='')
+    follow_up_recommended = models.BooleanField(default=False)
     location = models.CharField(max_length=200, blank=True, default='')
 
     def __str__(self):

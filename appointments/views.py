@@ -20,6 +20,39 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         # Mark availability as unavailable during appointment time
         self._update_availability_on_booking(appointment)
 
+    @action(detail=True, methods=['patch'])
+    def update_notes(self, request, pk=None):
+        appointment = self.get_object()
+        if appointment.healthcare_provider != request.user:
+            return Response({'error': 'Only the assigned healthcare provider may update appointment notes.'}, status=status.HTTP_403_FORBIDDEN)
+
+        appointment_end = datetime.combine(appointment.date, appointment.time) + appointment.duration
+        if timezone.is_naive(appointment_end):
+            appointment_end = timezone.make_aware(appointment_end, timezone.get_current_timezone())
+
+        if timezone.now() > appointment_end + timedelta(hours=12):
+            return Response({'error': 'Appointment notes may only be edited within 12 hours after the appointment end time.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = request.data
+        if 'notes' in data:
+            appointment.notes = data.get('notes', appointment.notes)
+        if 'reasons_for_visit' in data:
+            appointment.reasons_for_visit = data.get('reasons_for_visit', appointment.reasons_for_visit)
+        if 'examinations_performed' in data:
+            appointment.examinations_performed = data.get('examinations_performed', appointment.examinations_performed)
+        if 'tests_requested' in data:
+            appointment.tests_requested = data.get('tests_requested', appointment.tests_requested)
+        if 'new_medications' in data:
+            appointment.new_medications = data.get('new_medications', appointment.new_medications)
+        if 'referrals' in data:
+            appointment.referrals = data.get('referrals', appointment.referrals)
+        if 'follow_up_recommended' in data:
+            appointment.follow_up_recommended = data.get('follow_up_recommended', appointment.follow_up_recommended)
+
+        appointment.save()
+        serializer = self.get_serializer(appointment)
+        return Response(serializer.data)
+
     def _update_availability_on_booking(self, appointment):
         # Find overlapping availability and mark as unavailable
         day_of_week = appointment.date.weekday()
