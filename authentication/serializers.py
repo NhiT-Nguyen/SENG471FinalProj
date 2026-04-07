@@ -204,6 +204,87 @@ class HealthcareProviderRegistrationSerializer(serializers.Serializer):
         return healthcare_provider
 
 
+class FamilyMemberRegistrationSerializer(serializers.Serializer):
+    """Serializer for family member registration with relationship data"""
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True, min_length=8)
+    relationship_to_patient = serializers.ChoiceField(choices=[
+        ('spouse', 'Spouse'),
+        ('parent', 'Parent'),
+        ('child', 'Child'),
+        ('sibling', 'Sibling'),
+        ('grandparent', 'Grandparent'),
+        ('grandchild', 'Grandchild'),
+        ('aunt_uncle', 'Aunt/Uncle'),
+        ('niece_nephew', 'Niece/Nephew'),
+        ('cousin', 'Cousin'),
+        ('in_law', 'In-law'),
+        ('guardian', 'Guardian'),
+        ('other', 'Other'),
+    ], default='other')
+    phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    emergency_contact = serializers.BooleanField(default=False)
+    preferred_contact_method = serializers.ChoiceField(
+        choices=[('phone', 'Phone'), ('email', 'Email'), ('text', 'Text Message')],
+        default='email'
+    )
+
+    def validate(self, data):
+        """Validate family member registration data."""
+        if data.get('password') != data.get('password_confirm'):
+            raise serializers.ValidationError({'password': 'Passwords do not match.'})
+
+        if User.objects.filter(username=data.get('username')).exists():
+            raise serializers.ValidationError({'username': 'This username is already taken.'})
+
+        if User.objects.filter(email=data.get('email')).exists():
+            raise serializers.ValidationError({'email': 'This email is already registered.'})
+
+        return data
+
+    def create(self, validated_data):
+        """Create a family member user account with relationship profile data."""
+        password = validated_data.pop('password')
+        validated_data.pop('password_confirm')
+        relationship_to_patient = validated_data.pop('relationship_to_patient')
+        phone_number = validated_data.pop('phone_number', '')
+        address = validated_data.pop('address', '')
+        emergency_contact = validated_data.pop('emergency_contact', False)
+        preferred_contact_method = validated_data.pop('preferred_contact_method', 'email')
+
+        # Create User account for family member
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            password=password
+        )
+
+        # Create Profile with family_member role
+        Profile.objects.create(user=user, role='family_member')
+
+        # Create FamilyMember record linked to the user
+        family_member = FamilyMember.objects.create(
+            user=user,
+            relationship_to_patient=relationship_to_patient,
+            phone_number=phone_number,
+            address=address,
+            emergency_contact=emergency_contact,
+            preferred_contact_method=preferred_contact_method
+        )
+
+        # Create token for the family member user
+        Token.objects.create(user=user)
+
+        return family_member
+
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
@@ -301,3 +382,14 @@ class FamilyMemberSerializer(serializers.Serializer):
                 f'User "{value}" has role "{profile.role}". Only users with role "family_member" can be added.'
             )
         return value
+
+
+class FamilyMemberModelSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = FamilyMember
+        fields = ['id', 'user', 'relationship_to_patient', 'relationship_display', 'phone_number', 'address', 'emergency_contact', 'preferred_contact_method']
+
+    def get_relationship_display(self, obj):
+        return obj.get_relationship_to_patient_display()

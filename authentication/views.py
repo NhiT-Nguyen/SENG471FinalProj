@@ -5,11 +5,12 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
-from .models import Profile, Patient, HealthcareProvider
+from .models import Profile, Patient, HealthcareProvider, FamilyMember
 from .serializers import (
     ProfileSerializer, PatientSerializer, RegistrationSerializer,
     PatientRegistrationSerializer, HealthcareProviderRegistrationSerializer,
-    LoginSerializer, UserSerializer, UpdateProfileSerializer, FamilyMemberSerializer
+    FamilyMemberRegistrationSerializer, LoginSerializer, UserSerializer,
+    UpdateProfileSerializer, FamilyMemberSerializer
 )
 
 
@@ -155,6 +156,62 @@ class HealthcareProviderRegistrationView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class FamilyMemberRegistrationView(APIView):
+    """
+    API endpoint for family member account registration.
+    Allows family members to create their own accounts with relationship data.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        """
+        Register a new family member account.
+
+        Expected payload:
+        {
+            "username": "string",
+            "email": "string",
+            "first_name": "string",
+            "last_name": "string",
+            "password": "string",
+            "password_confirm": "string",
+            "relationship_to_patient": "spouse|parent|child|sibling|...",
+            "phone_number": "string (optional)",
+            "address": "string (optional)",
+            "emergency_contact": boolean (optional, default false),
+            "preferred_contact_method": "phone|email|text" (optional, default email)
+        }
+        """
+        serializer = FamilyMemberRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            family_member = serializer.save()
+            token = Token.objects.get(user=family_member.user)
+            return Response(
+                {
+                    'message': 'Family member account created successfully',
+                    'family_member': {
+                        'id': family_member.id,
+                        'relationship_to_patient': family_member.relationship_to_patient,
+                        'relationship_display': family_member.get_relationship_to_patient_display(),
+                        'phone_number': family_member.phone_number,
+                        'address': family_member.address,
+                        'emergency_contact': family_member.emergency_contact,
+                        'preferred_contact_method': family_member.preferred_contact_method,
+                        'user': {
+                            'id': family_member.user.id,
+                            'username': family_member.user.username,
+                            'email': family_member.user.email,
+                            'first_name': family_member.user.first_name,
+                            'last_name': family_member.user.last_name
+                        }
+                    },
+                    'token': token.key
+                },
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class LoginView(APIView):
     """
     API endpoint for user login.
@@ -224,6 +281,23 @@ class LoginView(APIView):
                         'years_of_experience': healthcare_provider.years_of_experience
                     }
                 except HealthcareProvider.DoesNotExist:
+                    pass
+            
+            # Include family member data if user is a family member
+            if profile.role == 'family_member':
+                try:
+                    from .models import FamilyMember
+                    family_member = FamilyMember.objects.get(user=user)
+                    response_data['family_member'] = {
+                        'id': family_member.id,
+                        'relationship_to_patient': family_member.relationship_to_patient,
+                        'relationship_display': family_member.get_relationship_to_patient_display(),
+                        'phone_number': family_member.phone_number,
+                        'address': family_member.address,
+                        'emergency_contact': family_member.emergency_contact,
+                        'preferred_contact_method': family_member.preferred_contact_method
+                    }
+                except FamilyMember.DoesNotExist:
                     pass
             
             return Response(response_data, status=status.HTTP_200_OK)
