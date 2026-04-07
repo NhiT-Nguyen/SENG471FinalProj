@@ -45,35 +45,10 @@ class HealthcareProvider(models.Model):
     hospital_clinic = models.CharField(max_length=200, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
     bio = models.TextField(blank=True)
-
-    def __str__(self):
-        return f"{self.user.get_full_name()} - {self.get_specialty_display()}"
-
-class HealthcareProvider(models.Model):
-    SPECIALIZATION_CHOICES = [
-        ('general_practice', 'General Practice'),
-        ('cardiology', 'Cardiology'),
-        ('neurology', 'Neurology'),
-        ('pediatrics', 'Pediatrics'),
-        ('orthopedics', 'Orthopedics'),
-        ('dermatology', 'Dermatology'),
-        ('psychiatry', 'Psychiatry'),
-        ('radiology', 'Radiology'),
-        ('emergency_medicine', 'Emergency Medicine'),
-        ('nursing', 'Nursing'),
-        ('pharmacy', 'Pharmacy'),
-        ('other', 'Other'),
-    ]
-
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='healthcare_provider_profile')
-    license_number = models.CharField(max_length=50, unique=True)
-    specialization = models.CharField(max_length=20, choices=SPECIALIZATION_CHOICES)
-    hospital_clinic = models.CharField(max_length=100, blank=True)
-    phone_number = models.CharField(max_length=20, blank=True)
     years_of_experience = models.PositiveIntegerField(default=0)
 
     def __str__(self):
-        return f"Dr. {self.user.get_full_name()} - {self.get_specialization_display()}"
+        return f"{self.user.get_full_name()} - {self.get_specialty_display()}"
 
 class FamilyMember(models.Model):
     RELATIONSHIP_CHOICES = [

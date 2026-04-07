@@ -16,6 +16,11 @@ class Appointment(models.Model):
         return f"Appointment for {self.patient.name} on {self.date}"
 
 class Availability(models.Model):
+    STATUS_CHOICES = [
+        ('available', 'Available'),
+        ('busy', 'Busy'),
+        ('appointment_request_pending', 'Appointment Request Pending'),
+    ]
     DAYS_OF_WEEK = [
         (0, 'Monday'),
         (1, 'Tuesday'),
@@ -31,6 +36,8 @@ class Availability(models.Model):
     end_time = models.TimeField()
     is_recurring = models.BooleanField(default=True)
     week_start_date = models.DateField(null=True, blank=True)  # For non-recurring overrides
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='available')
+    # Keep is_available for backwards compatibility but derive from status
     is_available = models.BooleanField(default=True)  # Can be set to False for booked slots
 
     def __str__(self):
@@ -51,3 +58,25 @@ class AvailabilityConfirmation(models.Model):
 
     def __str__(self):
         return f"{self.healthcare_provider.username} - Week of {self.week_start_date}: {'Confirmed' if self.confirmed else 'Pending'}"
+
+
+class AppointmentRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='appointment_requests')
+    healthcare_provider = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_requests')
+    requested_date = models.DateField()
+    requested_start_time = models.TimeField()
+    requested_end_time = models.TimeField()
+    notes = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Appointment request: {self.patient.name} with {self.healthcare_provider.get_full_name()} on {self.requested_date}"
+
