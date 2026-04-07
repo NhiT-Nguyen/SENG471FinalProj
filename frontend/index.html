@@ -107,6 +107,33 @@
     </div>
 
     <div class="section">
+        <h2>Request Appointment</h2>
+        <p>Click "View Full Availability" on a provider to select a specific time slot and request an appointment.</p>
+        <div id="providerAvailabilitySlots" style="margin-top: 20px;"></div>
+        <form id="appointmentRequestForm" style="display: none;">
+            <input type="hidden" id="requestProviderId">
+            <input type="hidden" id="requestPatientId">
+            <input type="hidden" id="requestDate">
+            <input type="hidden" id="requestStartTime">
+            <input type="hidden" id="requestEndTime">
+            <h3 id="requestProviderName"></h3>
+            <p>Date: <strong id="requestDateDisplay"></strong></p>
+            <p>Time: <strong id="requestTimeDisplay"></strong></p>
+            <textarea id="requestNotes" placeholder="Add notes about your appointment request (optional)" rows="4" style="width: 100%; margin: 10px 0;"></textarea>
+            <button type="submit" style="background: #28a745; color: white; border: none; cursor: pointer; padding: 10px;">Submit Appointment Request</button>
+            <button type="button" id="cancelRequestBtn" style="background: #999; color: white; border: none; cursor: pointer; padding: 10px; margin-left: 5px;">Cancel</button>
+        </form>
+        <div id="requestStatus"></div>
+    </div>
+
+    <div class="section">
+        <h2>Manage Appointment Requests (Healthcare Provider)</h2>
+        <p>Review and approve or reject appointment requests from patients and family members.</p>
+        <button id="loadPendingRequests">Load Pending Requests</button>
+        <div id="pendingRequestsList"></div>
+    </div>
+
+    <div class="section">
         <h2>Medications</h2>
         <button id="loadMedications">Load Medications</button>
         <form id="addMedicationForm">
@@ -364,18 +391,34 @@
             document.getElementById('providerSearchResults').innerHTML = html;
         }
 
-        window.viewProviderAvailability = async function(providerId) {
+        window.viewProviderAvailability = async function(providerId, providerName) {
             try {
-                const response = await fetch(`${baseURL}/appointments/availabilities/provider-availability/?provider_id=${providerId}`, {
+                const response = await fetch(`${baseURL}/appointments/availabilities/?healthcare_provider=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
-                let availHtml = '<h4>Availability for Provider</h4><ul>';
-                data.forEach(avail => {
-                    availHtml += `<li>${avail.day_of_week_display}: ${avail.start_time} - ${avail.end_time}</li>`;
-                });
-                availHtml += '</ul>';
-                document.getElementById('providerSearchResults').innerHTML += availHtml;
+                let availHtml = `<h3>Available Time Slots for ${providerName}</h3>`;
+                
+                // Filter only "available" status or is_available = true
+                const availableSlots = data.filter(avail => avail.status === 'available' || avail.is_available);
+                
+                if (availableSlots.length === 0) {
+                    availHtml += '<p>No available time slots.</p>';
+                } else {
+                    availHtml += '<ul style="list-style: none; padding: 0;">';
+                    availableSlots.forEach(avail => {
+                        const dayName = avail.day_of_week_display || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][avail.day_of_week];
+                        availHtml += `
+                            <li style="border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 4px;">
+                                <strong>${dayName}</strong>: ${avail.start_time} - ${avail.end_time}
+                                <button onclick="selectTimeSlot(${providerId}, '${providerName}', ${avail.day_of_week}, '${avail.start_time}', '${avail.end_time}')" style="background: #007bff; color: white; border: none; cursor: pointer; padding: 5px 10px; margin-left: 10px;">Request This Time</button>
+                            </li>
+                        `;
+                    });
+                    availHtml += '</ul>';
+                }
+                
+                document.getElementById('providerAvailabilitySlots').innerHTML = availHtml;
             } catch (error) {
                 displayOutput('Error loading availability: ' + error);
             }
@@ -384,7 +427,30 @@
         window.bookAppointmentWithProvider = function(providerId, providerName) {
             document.getElementById('apptProviderId').value = providerId;
             document.getElementById('providerNameDisplay').textContent = ' - ' + providerName;
-            document.scrollIntoView({behavior: 'smooth'});
+            document.querySelector('.section:has(#apptPatientId)').scrollIntoView({behavior: 'smooth'});
+        };
+
+        window.selectTimeSlot = function(providerId, providerName, dayOfWeek, startTime, endTime) {
+            // Convert day of week number to date (next occurrence of that day)
+            const today = new Date();
+            const currentDay = today.getDay();
+            let daysUntilTarget = dayOfWeek - currentDay;
+            if (daysUntilTarget <= 0) {
+                daysUntilTarget += 7;
+            }
+            const targetDate = new Date(today);
+            targetDate.setDate(today.getDate() + daysUntilTarget);
+            const dateString = targetDate.toISOString().split('T')[0];
+            
+            document.getElementById('requestProviderId').value = providerId;
+            document.getElementById('requestDate').value = dateString;
+            document.getElementById('requestStartTime').value = startTime;
+            document.getElementById('requestEndTime').value = endTime;
+            document.getElementById('requestProviderName').textContent = `Requesting appointment with ${providerName}`;
+            document.getElementById('requestDateDisplay').textContent = dateString;
+            document.getElementById('requestTimeDisplay').textContent = `${startTime} - ${endTime}`;
+            document.getElementById('appointmentRequestForm').style.display = 'block';
+            document.getElementById('appointmentRequestForm').scrollIntoView({behavior: 'smooth'});
         };
 
         // Appointments
@@ -425,6 +491,146 @@
                 displayOutput('Error booking appointment: ' + error);
             }
         });
+
+        // Appointment Request
+        document.getElementById('appointmentRequestForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const patient = document.getElementById('requestPatientId').value;
+            const healthcare_provider = document.getElementById('requestProviderId').value;
+            const requested_date = document.getElementById('requestDate').value;
+            const requested_start_time = document.getElementById('requestStartTime').value;
+            const requested_end_time = document.getElementById('requestEndTime').value;
+            const notes = document.getElementById('requestNotes').value;
+
+            if (!patient) {
+                document.getElementById('requestStatus').textContent = 'Error: Please enter your patient ID';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/request-appointment/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify({
+                        patient,
+                        healthcare_provider,
+                        requested_date,
+                        requested_start_time,
+                        requested_end_time,
+                        notes
+                    })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('requestStatus').textContent = 'Appointment request submitted successfully! Status: ' + data.status;
+                    document.getElementById('appointmentRequestForm').style.display = 'none';
+                    document.getElementById('requestNotes').value = '';
+                    document.getElementById('providerAvailabilitySlots').innerHTML = '<p><strong>Your appointment request has been submitted. The healthcare provider will review it and contact you with their response.</strong></p>';
+                } else {
+                    document.getElementById('requestStatus').textContent = 'Error: ' + JSON.stringify(data);
+                }
+            } catch (error) {
+                document.getElementById('requestStatus').textContent = 'Error submitting request: ' + error;
+            }
+        });
+
+        document.getElementById('cancelRequestBtn').addEventListener('click', () => {
+            document.getElementById('appointmentRequestForm').style.display = 'none';
+            document.getElementById('requestNotes').value = '';
+            document.getElementById('requestStatus').textContent = '';
+        });
+
+        // Manage Appointment Requests (Healthcare Provider)
+        document.getElementById('loadPendingRequests').addEventListener('click', async () => {
+            try {
+                // Get current user's provider ID - you may need to adjust this to get the actual logged-in provider ID
+                const profileResponse = await fetch(`${baseURL}/auth/profiles/`, {
+                    headers: setAuthHeader()
+                });
+                const profiles = await profileResponse.json();
+                let currentProviderId = null;
+                
+                // Find the healthcare_provider profile for the current user
+                for (let profile of profiles) {
+                    if (profile.role === 'healthcare_provider') {
+                        currentProviderId = profile.user.id;
+                        break;
+                    }
+                }
+                
+                if (!currentProviderId) {
+                    document.getElementById('pendingRequestsList').innerHTML = '<p>You are not a healthcare provider or your profile could not be found.</p>';
+                    return;
+                }
+                
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/pending-requests/?provider_id=${currentProviderId}`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                
+                let html = '<h3>Pending Appointment Requests</h3>';
+                if (!Array.isArray(data) || data.length === 0) {
+                    html += '<p>No pending requests.</p>';
+                } else {
+                    html += '<ul style="list-style: none; padding: 0;">';
+                    data.forEach(request => {
+                        html += `
+                            <li style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px;">
+                                <strong>Patient:</strong> ${request.patient_name}<br>
+                                <strong>Date:</strong> ${request.requested_date}<br>
+                                <strong>Time:</strong> ${request.requested_start_time} - ${request.requested_end_time}<br>
+                                <strong>Notes:</strong> ${request.notes || 'None'}<br>
+                                <strong>Status:</strong> ${request.status_display}<br>
+                                <button onclick="approveAppointmentRequest(${request.id})" style="background: #28a745; color: white; border: none; cursor: pointer; padding: 5px 10px; margin-right: 5px;">Approve</button>
+                                <button onclick="rejectAppointmentRequest(${request.id})" style="background: #dc3545; color: white; border: none; cursor: pointer; padding: 5px 10px;">Reject</button>
+                            </li>
+                        `;
+                    });
+                    html += '</ul>';
+                }
+                document.getElementById('pendingRequestsList').innerHTML = html;
+            } catch (error) {
+                displayOutput('Error loading pending requests: ' + error);
+            }
+        });
+
+        window.approveAppointmentRequest = async function(requestId) {
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/${requestId}/approve/`, {
+                    method: 'POST',
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    displayOutput('Appointment request approved! Appointment created: ' + JSON.stringify(data.created_appointment));
+                    document.getElementById('loadPendingRequests').click();
+                } else {
+                    displayOutput('Error: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                displayOutput('Error approving request: ' + error);
+            }
+        };
+
+        window.rejectAppointmentRequest = async function(requestId) {
+            if (confirm('Are you sure you want to reject this appointment request?')) {
+                try {
+                    const response = await fetch(`${baseURL}/appointments/appointment-requests/${requestId}/reject/`, {
+                        method: 'POST',
+                        headers: setAuthHeader()
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        displayOutput('Appointment request rejected.');
+                        document.getElementById('loadPendingRequests').click();
+                    } else {
+                        displayOutput('Error: ' + JSON.stringify(data));
+                    }
+                } catch (error) {
+                    displayOutput('Error rejecting request: ' + error);
+                }
+            }
+        };
 
         // Medications
         document.getElementById('loadMedications').addEventListener('click', async () => {
