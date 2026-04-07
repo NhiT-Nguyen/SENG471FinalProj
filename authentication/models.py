@@ -49,3 +49,33 @@ class HealthcareProvider(models.Model):
 
     def __str__(self):
         return f"Dr. {self.user.get_full_name()} - {self.get_specialization_display()}"
+
+class FamilyMember(models.Model):
+    RELATIONSHIP_CHOICES = [
+        ('spouse', 'Spouse'),
+        ('parent', 'Parent'),
+        ('child', 'Child'),
+        ('sibling', 'Sibling'),
+        ('grandparent', 'Grandparent'),
+        ('grandchild', 'Grandchild'),
+        ('aunt_uncle', 'Aunt/Uncle'),
+        ('niece_nephew', 'Niece/Nephew'),
+        ('cousin', 'Cousin'),
+        ('in_law', 'In-law'),
+        ('guardian', 'Guardian'),
+        ('other', 'Other'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='family_member_profile')
+    relationship_to_patient = models.CharField(max_length=20, choices=RELATIONSHIP_CHOICES, default='other')
+    phone_number = models.CharField(max_length=20, blank=True)
+    address = models.TextField(blank=True)
+    emergency_contact = models.BooleanField(default=False)
+    preferred_contact_method = models.CharField(
+        max_length=10,
+        choices=[('phone', 'Phone'), ('email', 'Email'), ('text', 'Text Message')],
+        default='email'
+    )
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.get_relationship_to_patient_display()}"
