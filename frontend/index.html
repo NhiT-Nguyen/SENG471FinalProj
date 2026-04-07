@@ -63,7 +63,9 @@
             <input type="number" id="apptPatientId" placeholder="Patient ID" required>
             <input type="date" id="apptDate" required>
             <input type="time" id="apptTime" required>
+            <input type="text" id="apptDuration" placeholder="Duration (e.g., 01:00:00)" required>
             <input type="text" id="apptNotes" placeholder="Notes">
+            <input type="text" id="apptLocation" placeholder="Location">
             <button type="submit">Add Appointment</button>
         </form>
         <div id="appointmentsList"></div>
@@ -121,15 +123,31 @@
     </div>
 
     <div class="section">
-        <h2>Notification Settings</h2>
-        <button id="loadSettings">Load Settings</button>
-        <form id="updateSettingsForm">
-            <label><input type="checkbox" id="emailAlerts"> Email Alerts</label>
-            <label><input type="checkbox" id="smsAlerts"> SMS Alerts</label>
-            <label><input type="checkbox" id="pushNotifications"> Push Notifications</label>
-            <button type="submit">Update Settings</button>
+        <h2>Availability Management</h2>
+        <button id="loadAvailabilities">Load Availabilities</button>
+        <form id="addAvailabilityForm">
+            <select id="availDayOfWeek" required>
+                <option value="0">Monday</option>
+                <option value="1">Tuesday</option>
+                <option value="2">Wednesday</option>
+                <option value="3">Thursday</option>
+                <option value="4">Friday</option>
+                <option value="5">Saturday</option>
+                <option value="6">Sunday</option>
+            </select>
+            <input type="time" id="availStartTime" required>
+            <input type="time" id="availEndTime" required>
+            <label><input type="checkbox" id="availRecurring" checked> Recurring</label>
+            <button type="submit">Add Availability</button>
         </form>
-        <div id="settingsDisplay"></div>
+        <div id="availabilitiesList"></div>
+    </div>
+
+    <div class="section">
+        <h2>Availability Confirmations</h2>
+        <button id="loadConfirmations">Load Pending Confirmations</button>
+        <button id="confirmWeek">Confirm This Week</button>
+        <div id="confirmationsList"></div>
     </div>
 
     <div id="output"></div>
@@ -275,12 +293,14 @@
             const patient = document.getElementById('apptPatientId').value;
             const date = document.getElementById('apptDate').value;
             const time = document.getElementById('apptTime').value;
+            const duration = document.getElementById('apptDuration').value;
             const notes = document.getElementById('apptNotes').value;
+            const location = document.getElementById('apptLocation').value;
             try {
                 const response = await fetch(`${baseURL}/appointments/appointments/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
-                    body: JSON.stringify({ patient, caregiver: 1, date, time, notes })  // Assuming caregiver id 1
+                    body: JSON.stringify({ patient, healthcare_provider: 1, date, time, duration, notes, location })  // Assuming healthcare_provider id 1
                 });
                 const data = await response.json();
                 displayOutput('Appointment added: ' + JSON.stringify(data));
@@ -426,41 +446,73 @@
             }
         });
 
-        // Notification Settings
-        document.getElementById('loadSettings').addEventListener('click', async () => {
+        // Availability
+        document.getElementById('loadAvailabilities').addEventListener('click', async () => {
             try {
-                const response = await fetch(`${baseURL}/notifications/settings/`, {
+                const response = await fetch(`${baseURL}/appointments/availabilities/?provider_id=1`, {  // Assuming provider id 1
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
-                document.getElementById('settingsDisplay').textContent = JSON.stringify(data, null, 2);
-                if (data.length > 0) {
-                    const settings = data[0];
-                    document.getElementById('emailAlerts').checked = settings.email_alerts;
-                    document.getElementById('smsAlerts').checked = settings.sms_alerts;
-                    document.getElementById('pushNotifications').checked = settings.push_notifications;
-                }
+                document.getElementById('availabilitiesList').textContent = JSON.stringify(data, null, 2);
             } catch (error) {
-                displayOutput('Error loading settings: ' + error);
+                displayOutput('Error loading availabilities: ' + error);
             }
         });
 
-        document.getElementById('updateSettingsForm').addEventListener('submit', async (e) => {
+        document.getElementById('addAvailabilityForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email_alerts = document.getElementById('emailAlerts').checked;
-            const sms_alerts = document.getElementById('smsAlerts').checked;
-            const push_notifications = document.getElementById('pushNotifications').checked;
+            const day_of_week = document.getElementById('availDayOfWeek').value;
+            const start_time = document.getElementById('availStartTime').value;
+            const end_time = document.getElementById('availEndTime').value;
+            const is_recurring = document.getElementById('availRecurring').checked;
             try {
-                const response = await fetch(`${baseURL}/notifications/settings/`, {
+                const response = await fetch(`${baseURL}/appointments/availabilities/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
-                    body: JSON.stringify({ user: 1, email_alerts, sms_alerts, push_notifications })  // Assuming user id 1
+                    body: JSON.stringify({ healthcare_provider: 1, day_of_week, start_time, end_time, is_recurring })  // Assuming healthcare_provider id 1
                 });
                 const data = await response.json();
-                displayOutput('Settings updated: ' + JSON.stringify(data));
-                document.getElementById('loadSettings').click();
+                displayOutput('Availability added: ' + JSON.stringify(data));
+                document.getElementById('loadAvailabilities').click();
             } catch (error) {
-                displayOutput('Error updating settings: ' + error);
+                displayOutput('Error adding availability: ' + error);
+            }
+        });
+
+        // Confirmations
+        document.getElementById('loadConfirmations').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/appointments/availability-confirmations/pending-confirmations/?provider_id=1`, {  // Assuming provider id 1
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                document.getElementById('confirmationsList').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                displayOutput('Error loading confirmations: ' + error);
+            }
+        });
+
+        document.getElementById('confirmWeek').addEventListener('click', async () => {
+            try {
+                // First get the pending confirmation
+                const response = await fetch(`${baseURL}/appointments/availability-confirmations/pending-confirmations/?provider_id=1`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                if (data.length > 0) {
+                    const confirmationId = data[0].id;
+                    const confirmResponse = await fetch(`${baseURL}/appointments/availability-confirmations/${confirmationId}/confirm/`, {
+                        method: 'POST',
+                        headers: setAuthHeader()
+                    });
+                    const confirmData = await confirmResponse.json();
+                    displayOutput('Week confirmed: ' + JSON.stringify(confirmData));
+                    document.getElementById('loadConfirmations').click();
+                } else {
+                    displayOutput('No pending confirmations');
+                }
+            } catch (error) {
+                displayOutput('Error confirming week: ' + error);
             }
         });
 

@@ -19,8 +19,15 @@ A digital platform to enable caregivers, family members, and healthcare provider
 - Patient management
 
 ### Appointment Management
-- Schedule and manage appointments
-- Link appointments to patients and caregivers
+- Schedule and manage appointments with healthcare providers
+- Appointment fields: patient, healthcare provider, date, time, duration, notes, location
+- Automatic availability updates when appointments are booked
+
+### Availability Management
+- Healthcare providers can set weekly recurring availability windows
+- Option to edit availability on a week-by-week basis
+- Automatic marking of unavailable time slots when appointments are confirmed
+- Weekly confirmation prompts for healthcare providers
 
 ### Medication Management
 - Track medications for patients
@@ -73,7 +80,11 @@ The API will be available at `http://127.0.0.1:8000/api/`
   - Profiles: `/api/auth/profiles/`
   - Patients: `/api/auth/patients/`
 
-- Appointments: `/api/appointments/appointments/`
+- Appointments: `/api/appointments/`
+  - Appointments: `/api/appointments/appointments/`
+  - Availabilities: `/api/appointments/availabilities/`
+  - Availability Confirmations: `/api/appointments/availability-confirmations/`
+    - Pending confirmations: `/api/appointments/availability-confirmations/pending-confirmations/`
 
 - Medications: `/api/medications/medications/`
 
@@ -83,12 +94,9 @@ The API will be available at `http://127.0.0.1:8000/api/`
 
 - Token Auth: `/api-token-auth/`
 
-## Usage
+## Management Commands
 
-1. Start the backend server.
-2. Open the frontend in a browser.
-3. Register/login users via the admin or API.
-4. Use the frontend to manage patients, appointments, medications, and settings.
+- `python manage.py create_weekly_confirmations`: Creates weekly availability confirmation prompts for all healthcare providers. Run this command weekly (e.g., every Monday) to prompt providers to confirm their availability for the upcoming week.
 
 ## Development Notes
 
