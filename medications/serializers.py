@@ -7,7 +7,11 @@ class MedicationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Medication
-        fields = ['id', 'patient', 'prescribed_by', 'prescribed_by_username', 'name', 'dosage', 'schedule', 'instructions', 'start_date', 'end_date', 'is_current', 'reminder_enabled', 'reminder_time', 'reminder_days']
+        fields = [
+            'id', 'patient', 'prescribed_by', 'prescribed_by_username', 'name', 'dosage', 'schedule', 'instructions',
+            'start_date', 'end_date', 'is_current', 'reminder_enabled', 'reminder_time', 'reminder_days',
+            'refill_reminder_enabled', 'refill_reminder_date', 'refill_reminder_days_before'
+        ]
 
 class MedicationAdministrationSerializer(serializers.ModelSerializer):
     medication_name = serializers.CharField(source='medication.name', read_only=True)
