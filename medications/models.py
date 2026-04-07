@@ -1,7 +1,6 @@
 from django.db import models
 from authentication.models import Patient
 from django.contrib.auth.models import User
-import json
 
 class Medication(models.Model):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE)
@@ -15,6 +14,9 @@ class Medication(models.Model):
     reminder_enabled = models.BooleanField(default=False)
     reminder_time = models.TimeField(null=True, blank=True)
     reminder_days = models.JSONField(default=list, blank=True)  # list of days, e.g., ['monday', 'wednesday']
+    refill_reminder_enabled = models.BooleanField(default=False)
+    refill_reminder_date = models.DateField(null=True, blank=True)
+    refill_reminder_days_before = models.PositiveIntegerField(default=7)
 
     def __str__(self):
         return f"{self.name} for {self.patient.name}"

@@ -80,6 +80,18 @@
             <input type="date" id="medStartDate" required>
             <button type="submit">Add Medication</button>
         </form>
+        <h3>Refill Reminder</h3>
+        <form id="setRefillReminderForm">
+            <input type="number" id="reminderMedicationId" placeholder="Medication ID" required>
+            <input type="date" id="refillReminderDate" placeholder="Refill Date">
+            <input type="number" id="refillReminderDaysBefore" placeholder="Days Before" min="0" value="7">
+            <label><input type="checkbox" id="refillReminderEnabled" checked> Enable Refill Reminder</label>
+            <button type="submit">Set / Update Refill Reminder</button>
+        </form>
+        <form id="clearRefillReminderForm">
+            <input type="number" id="clearReminderMedicationId" placeholder="Medication ID" required>
+            <button type="submit">Remove Refill Reminder</button>
+        </form>
         <div id="medicationsList"></div>
     </div>
 
@@ -309,6 +321,51 @@
                 document.getElementById('loadMedications').click();
             } catch (error) {
                 displayOutput('Error adding medication: ' + error);
+            }
+        });
+
+        document.getElementById('setRefillReminderForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const medicationId = document.getElementById('reminderMedicationId').value;
+            const refill_reminder_enabled = document.getElementById('refillReminderEnabled').checked;
+            const refill_reminder_date = document.getElementById('refillReminderDate').value;
+            const refill_reminder_days_before = parseInt(document.getElementById('refillReminderDaysBefore').value, 10) || 7;
+
+            try {
+                const response = await fetch(`${baseURL}/medications/medications/${medicationId}/set_refill_reminder/`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify({ refill_reminder_enabled, refill_reminder_date, refill_reminder_days_before })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    displayOutput('Refill reminder updated: ' + JSON.stringify(data));
+                } else {
+                    displayOutput('Error setting refill reminder: ' + JSON.stringify(data));
+                }
+                document.getElementById('loadMedications').click();
+            } catch (error) {
+                displayOutput('Error setting refill reminder: ' + error);
+            }
+        });
+
+        document.getElementById('clearRefillReminderForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const medicationId = document.getElementById('clearReminderMedicationId').value;
+            try {
+                const response = await fetch(`${baseURL}/medications/medications/${medicationId}/clear_refill_reminder/`, {
+                    method: 'POST',
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    displayOutput('Refill reminder removed: ' + JSON.stringify(data));
+                } else {
+                    displayOutput('Error removing refill reminder: ' + JSON.stringify(data));
+                }
+                document.getElementById('loadMedications').click();
+            } catch (error) {
+                displayOutput('Error removing refill reminder: ' + error);
             }
         });
 
