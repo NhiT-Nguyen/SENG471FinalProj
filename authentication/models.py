@@ -25,6 +25,31 @@ class Patient(models.Model):
         return self.name
 
 class HealthcareProvider(models.Model):
+    SPECIALTY_CHOICES = [
+        ('general_practice', 'General Practice'),
+        ('cardiology', 'Cardiology'),
+        ('neurology', 'Neurology'),
+        ('pediatrics', 'Pediatrics'),
+        ('orthopedics', 'Orthopedics'),
+        ('dermatology', 'Dermatology'),
+        ('psychiatry', 'Psychiatry'),
+        ('radiology', 'Radiology'),
+        ('emergency_medicine', 'Emergency Medicine'),
+        ('nursing', 'Nursing'),
+        ('pharmacy', 'Pharmacy'),
+        ('other', 'Other'),
+    ]
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='healthcare_provider_profile')
+    specialty = models.CharField(max_length=50, choices=SPECIALTY_CHOICES, default='general_practice')
+    license_number = models.CharField(max_length=100, blank=True)
+    hospital_clinic = models.CharField(max_length=200, blank=True)
+    phone_number = models.CharField(max_length=20, blank=True)
+    bio = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.get_specialty_display()}"
+
+class HealthcareProvider(models.Model):
     SPECIALIZATION_CHOICES = [
         ('general_practice', 'General Practice'),
         ('cardiology', 'Cardiology'),
