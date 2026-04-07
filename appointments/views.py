@@ -8,7 +8,7 @@ from django.db.models import Q
 from .models import Appointment, Availability, AvailabilityConfirmation, AppointmentRequest
 from notifications.models import Alert
 from .serializers import AppointmentSerializer, AvailabilitySerializer, AvailabilityConfirmationSerializer, AvailabilityWithProviderSerializer, AppointmentRequestSerializer
-from authentication.models import HealthcareProvider, Patient
+from authentication.models import HealthcareProvider, Patient, Profile
 from authentication.serializers import HealthcareProviderDetailSerializer
 
 class AppointmentViewSet(viewsets.ModelViewSet):
@@ -19,6 +19,58 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment = serializer.save()
         # Mark availability as unavailable during appointment time
         self._update_availability_on_booking(appointment)
+
+    @action(detail=False, methods=['get'])
+    def history(self, request):
+        """Get appointment history for the signed-in user."""
+        try:
+            role = request.user.profile.role
+        except Profile.DoesNotExist:
+            return Response({'error': 'User profile is required to access appointment history.'}, status=status.HTTP_403_FORBIDDEN)
+
+        appointments = Appointment.objects.none()
+        if role == 'healthcare_provider':
+            appointments = Appointment.objects.filter(healthcare_provider=request.user)
+        elif role == 'patient':
+            patient = Patient.objects.filter(user=request.user).first()
+            if patient:
+                appointments = Appointment.objects.filter(patient=patient)
+        elif role == 'family_member':
+            patients = Patient.objects.filter(family_members=request.user)
+            appointments = Appointment.objects.filter(patient__in=patients)
+        elif role == 'caregiver':
+            appointments = Appointment.objects.filter(patient__caregivers=request.user)
+        else:
+            return Response({'error': 'User role is not allowed to access appointment history.'}, status=status.HTTP_403_FORBIDDEN)
+
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        provider_id = request.query_params.get('provider_id')
+
+        if start_date:
+            try:
+                start_date_val = datetime.strptime(start_date, '%Y-%m-%d').date()
+                appointments = appointments.filter(date__gte=start_date_val)
+            except ValueError:
+                return Response({'error': 'Invalid start_date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if end_date:
+            try:
+                end_date_val = datetime.strptime(end_date, '%Y-%m-%d').date()
+                appointments = appointments.filter(date__lte=end_date_val)
+            except ValueError:
+                return Response({'error': 'Invalid end_date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if provider_id:
+            appointments = appointments.filter(healthcare_provider_id=provider_id)
+
+        ordered_appointments = appointments.order_by('-date', '-time')
+        if role == 'caregiver':
+            from .serializers import CaregiverAppointmentHistorySerializer
+            serializer = CaregiverAppointmentHistorySerializer(ordered_appointments, many=True)
+        else:
+            serializer = self.get_serializer(ordered_appointments, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['patch'])
     def update_notes(self, request, pk=None):
