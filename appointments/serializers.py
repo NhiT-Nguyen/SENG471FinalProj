@@ -3,13 +3,26 @@ from .models import Appointment, Availability, AvailabilityConfirmation, Appoint
 from authentication.serializers import HealthcareProviderDetailSerializer
 
 class AppointmentSerializer(serializers.ModelSerializer):
+    provider_name = serializers.CharField(source='healthcare_provider.get_full_name', read_only=True)
+    patient_name = serializers.CharField(source='patient.name', read_only=True)
+
     class Meta:
         model = Appointment
         fields = [
-            'id', 'patient', 'healthcare_provider', 'date', 'time', 'duration',
+            'id', 'patient', 'patient_name', 'healthcare_provider', 'provider_name',
+            'date', 'time', 'duration',
             'notes', 'reasons_for_visit', 'examinations_performed', 'tests_requested',
             'new_medications', 'referrals', 'follow_up_recommended', 'location'
         ]
+
+
+class CaregiverAppointmentHistorySerializer(serializers.ModelSerializer):
+    provider_name = serializers.CharField(source='healthcare_provider.get_full_name', read_only=True)
+    patient_name = serializers.CharField(source='patient.name', read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = ['id', 'patient_name', 'provider_name', 'date', 'time', 'new_medications']
 
 class AvailabilitySerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
