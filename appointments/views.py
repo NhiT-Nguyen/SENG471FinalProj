@@ -2,9 +2,12 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
+from django.db.models import Q
 from .models import Appointment, Availability, AvailabilityConfirmation
-from .serializers import AppointmentSerializer, AvailabilitySerializer, AvailabilityConfirmationSerializer
+from .serializers import AppointmentSerializer, AvailabilitySerializer, AvailabilityConfirmationSerializer, AvailabilityWithProviderSerializer
+from authentication.models import HealthcareProvider
+from authentication.serializers import HealthcareProviderDetailSerializer
 
 class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.all()
@@ -50,11 +53,89 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def provider_availability(self, request):
+        """Get availability slots for a specific provider"""
         provider_id = request.query_params.get('provider_id')
         if not provider_id:
             return Response({'error': 'provider_id required'}, status=status.HTTP_400_BAD_REQUEST)
-        availabilities = self.queryset.filter(healthcare_provider_id=provider_id)
-        serializer = self.get_serializer(availabilities, many=True)
+        availabilities = self.queryset.filter(healthcare_provider_id=provider_id, is_available=True)
+        serializer = AvailabilityWithProviderSerializer(availabilities, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def search_providers(self, request):
+        """Search healthcare providers by name"""
+        search_term = request.query_params.get('q', '')
+        if not search_term:
+            return Response({'error': 'Search term required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        providers = HealthcareProvider.objects.filter(
+            Q(user__first_name__icontains=search_term) |
+            Q(user__last_name__icontains=search_term) |
+            Q(user__username__icontains=search_term)
+        )
+        serializer = HealthcareProviderDetailSerializer(providers, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def filter_by_specialty(self, request):
+        """Filter healthcare providers by specialty"""
+        specialty = request.query_params.get('specialty', '')
+        if not specialty:
+            return Response({'error': 'Specialty required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        providers = HealthcareProvider.objects.filter(specialty=specialty)
+        serializer = HealthcareProviderDetailSerializer(providers, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def available_at_datetime(self, request):
+        """Get healthcare providers available at a specific date and time"""
+        date_str = request.query_params.get('date')
+        time_str = request.query_params.get('time')
+        
+        if not date_str or not time_str:
+            return Response({'error': 'Date and time required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            time = datetime.strptime(time_str, '%H:%M:%S').time()
+        except ValueError:
+            return Response({'error': 'Invalid date or time format. Use YYYY-MM-DD and HH:MM:SS'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        day_of_week = date.weekday()
+        
+        # Find all availability slots for the requested day and time
+        availabilities = Availability.objects.filter(
+            day_of_week=day_of_week,
+            start_time__lte=time,
+            end_time__gt=time,
+            is_available=True
+        ).select_related('healthcare_provider')
+        
+        # Also check non-recurring overrides for that specific week
+        week_start = date - timedelta(days=date.weekday())
+        week_availabilities = Availability.objects.filter(
+            day_of_week=day_of_week,
+            start_time__lte=time,
+            end_time__gt=time,
+            is_available=True,
+            is_recurring=False,
+            week_start_date=week_start
+        ).select_related('healthcare_provider')
+        
+        # Combine results and get unique providers
+        all_availabilities = list(availabilities) + list(week_availabilities)
+        unique_providers = {}
+        for avail in all_availabilities:
+            provider_id = avail.healthcare_provider_id
+            if provider_id not in unique_providers:
+                try:
+                    provider = HealthcareProvider.objects.get(user_id=provider_id)
+                    unique_providers[provider_id] = provider
+                except HealthcareProvider.DoesNotExist:
+                    pass
+        
+        serializer = HealthcareProviderDetailSerializer(unique_providers.values(), many=True)
         return Response(serializer.data)
 
 class AvailabilityConfirmationViewSet(viewsets.ModelViewSet):

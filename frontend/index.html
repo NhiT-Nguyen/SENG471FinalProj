@@ -6,10 +6,16 @@
     <title>Healthcare Coordination Platform</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        .section { margin-bottom: 30px; }
+        .section { margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; }
         form { margin-bottom: 20px; }
-        input, button { margin: 5px; padding: 8px; }
-        #output { margin-top: 20px; white-space: pre-wrap; }
+        input, select, button { margin: 5px; padding: 8px; }
+        #output { margin-top: 20px; white-space: pre-wrap; background: #f5f5f5; padding: 10px; }
+        .search-form, .filter-form, .availability-search-form { margin-bottom: 15px; }
+        #providerSearchResults ul { list-style: none; padding: 0; }
+        #providerSearchResults li { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        #providerSearchResults strong { color: #333; }
+        #providerSearchResults button { background: #007bff; color: white; border: none; cursor: pointer; }
+        #providerSearchResults button:hover { background: #0056b3; }
     </style>
 </head>
 <body>
@@ -46,27 +52,56 @@
     </div>
 
     <div class="section">
-        <h2>Patients</h2>
-        <button id="loadPatients">Load Patients</button>
-        <form id="addPatientForm">
-            <input type="text" id="patientName" placeholder="Patient Name" required>
-            <input type="date" id="patientDob" required>
-            <button type="submit">Add Patient</button>
-        </form>
-        <div id="patientsList"></div>
+        <h2>Find Healthcare Providers</h2>
+        
+        <h3>Search by Name</h3>
+        <div class="search-form">
+            <input type="text" id="searchProviderName" placeholder="Search by first name, last name, or username">
+            <button id="searchByNameBtn">Search</button>
+        </div>
+        
+        <h3>Filter by Specialty</h3>
+        <div class="filter-form">
+            <select id="specialtyFilter">
+                <option value="">-- Select Specialty --</option>
+                <option value="general_practice">General Practice</option>
+                <option value="cardiology">Cardiology</option>
+                <option value="neurology">Neurology</option>
+                <option value="pediatrics">Pediatrics</option>
+                <option value="orthopedics">Orthopedics</option>
+                <option value="dermatology">Dermatology</option>
+                <option value="psychiatry">Psychiatry</option>
+                <option value="radiology">Radiology</option>
+                <option value="emergency_medicine">Emergency Medicine</option>
+                <option value="nursing">Nursing</option>
+                <option value="pharmacy">Pharmacy</option>
+                <option value="other">Other</option>
+            </select>
+            <button id="filterBySpecialtyBtn">Filter</button>
+        </div>
+
+        <h3>Find by Availability</h3>
+        <div class="availability-search-form">
+            <input type="date" id="availabilityDate" required>
+            <input type="time" id="availabilityTime" required>
+            <button id="searchByAvailabilityBtn">Find Available Providers</button>
+        </div>
+        
+        <div id="providerSearchResults" style="margin-top: 20px;"></div>
     </div>
 
     <div class="section">
-        <h2>Appointments</h2>
+        <h2>Book Appointment<span id="providerNameDisplay"></span></h2>
         <button id="loadAppointments">Load Appointments</button>
         <form id="addAppointmentForm">
             <input type="number" id="apptPatientId" placeholder="Patient ID" required>
+            <input type="hidden" id="apptProviderId">
             <input type="date" id="apptDate" required>
             <input type="time" id="apptTime" required>
             <input type="text" id="apptDuration" placeholder="Duration (e.g., 01:00:00)" required>
             <input type="text" id="apptNotes" placeholder="Notes">
             <input type="text" id="apptLocation" placeholder="Location">
-            <button type="submit">Add Appointment</button>
+            <button type="submit">Book Appointment</button>
         </form>
         <div id="appointmentsList"></div>
     </div>
@@ -244,36 +279,113 @@
             }
         });
 
-        // Patients
-        document.getElementById('loadPatients').addEventListener('click', async () => {
+        // Provider Search and Filtering
+        document.getElementById('searchByNameBtn').addEventListener('click', async () => {
+            const searchTerm = document.getElementById('searchProviderName').value;
+            if (!searchTerm) {
+                displayOutput('Please enter a search term');
+                return;
+            }
             try {
-                const response = await fetch(`${baseURL}/auth/patients/`, {
+                const response = await fetch(`${baseURL}/appointments/availabilities/search-providers/?q=${encodeURIComponent(searchTerm)}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
-                document.getElementById('patientsList').textContent = JSON.stringify(data, null, 2);
+                displayProviders(data, 'Search Results');
             } catch (error) {
-                displayOutput('Error loading patients: ' + error);
+                displayOutput('Error searching providers: ' + error);
             }
         });
 
-        document.getElementById('addPatientForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const name = document.getElementById('patientName').value;
-            const date_of_birth = document.getElementById('patientDob').value;
+        document.getElementById('filterBySpecialtyBtn').addEventListener('click', async () => {
+            const specialty = document.getElementById('specialtyFilter').value;
+            if (!specialty) {
+                displayOutput('Please select a specialty');
+                return;
+            }
             try {
-                const response = await fetch(`${baseURL}/auth/patients/`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
-                    body: JSON.stringify({ name, date_of_birth, caregivers: [] })
+                const response = await fetch(`${baseURL}/appointments/availabilities/filter-by-specialty/?specialty=${specialty}`, {
+                    headers: setAuthHeader()
                 });
                 const data = await response.json();
-                displayOutput('Patient added: ' + JSON.stringify(data));
-                document.getElementById('loadPatients').click();
+                displayProviders(data, `Providers - ${specialty}`);
             } catch (error) {
-                displayOutput('Error adding patient: ' + error);
+                displayOutput('Error filtering providers: ' + error);
             }
         });
+
+        document.getElementById('searchByAvailabilityBtn').addEventListener('click', async () => {
+            const date = document.getElementById('availabilityDate').value;
+            const time = document.getElementById('availabilityTime').value;
+            if (!date || !time) {
+                displayOutput('Please select both date and time');
+                return;
+            }
+            try {
+                const response = await fetch(`${baseURL}/appointments/availabilities/available-at-datetime/?date=${date}&time=${time}:00`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    displayProviders(data, `Available Providers on ${date} at ${time}`);
+                } else {
+                    displayOutput('Error: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                displayOutput('Error searching availability: ' + error);
+            }
+        });
+
+        function displayProviders(providers, title) {
+            let html = `<h3>${title}</h3>`;
+            if (!Array.isArray(providers) || providers.length === 0) {
+                html += '<p>No providers found.</p>';
+                document.getElementById('providerSearchResults').innerHTML = html;
+                return;
+            }
+            
+            html += '<ul>';
+            providers.forEach(provider => {
+                const name = provider.user_name || 'Unknown';
+                const specialty = provider.specialty_display || provider.specialty || 'N/A';
+                const bio = provider.bio || '';
+                const clinic = provider.hospital_clinic || 'N/A';
+                html += `
+                    <li>
+                        <strong>${name}</strong> - ${specialty}
+                        <p>Clinic: ${clinic}</p>
+                        <p>${bio}</p>
+                        <button onclick="viewProviderAvailability(${provider.user_id})">View Full Availability</button>
+                        <button onclick="bookAppointmentWithProvider(${provider.user_id}, '${name}')">Book Appointment</button>
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            document.getElementById('providerSearchResults').innerHTML = html;
+        }
+
+        window.viewProviderAvailability = async function(providerId) {
+            try {
+                const response = await fetch(`${baseURL}/appointments/availabilities/provider-availability/?provider_id=${providerId}`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                let availHtml = '<h4>Availability for Provider</h4><ul>';
+                data.forEach(avail => {
+                    availHtml += `<li>${avail.day_of_week_display}: ${avail.start_time} - ${avail.end_time}</li>`;
+                });
+                availHtml += '</ul>';
+                document.getElementById('providerSearchResults').innerHTML += availHtml;
+            } catch (error) {
+                displayOutput('Error loading availability: ' + error);
+            }
+        };
+
+        window.bookAppointmentWithProvider = function(providerId, providerName) {
+            document.getElementById('apptProviderId').value = providerId;
+            document.getElementById('providerNameDisplay').textContent = ' - ' + providerName;
+            document.scrollIntoView({behavior: 'smooth'});
+        };
 
         // Appointments
         document.getElementById('loadAppointments').addEventListener('click', async () => {
@@ -291,6 +403,7 @@
         document.getElementById('addAppointmentForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const patient = document.getElementById('apptPatientId').value;
+            const healthcare_provider = document.getElementById('apptProviderId').value || 1;
             const date = document.getElementById('apptDate').value;
             const time = document.getElementById('apptTime').value;
             const duration = document.getElementById('apptDuration').value;
@@ -300,13 +413,16 @@
                 const response = await fetch(`${baseURL}/appointments/appointments/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
-                    body: JSON.stringify({ patient, healthcare_provider: 1, date, time, duration, notes, location })  // Assuming healthcare_provider id 1
+                    body: JSON.stringify({ patient, healthcare_provider, date, time, duration, notes, location })
                 });
                 const data = await response.json();
-                displayOutput('Appointment added: ' + JSON.stringify(data));
+                displayOutput('Appointment booked: ' + JSON.stringify(data));
                 document.getElementById('loadAppointments').click();
+                // Reset provider selection
+                document.getElementById('apptProviderId').value = '';
+                document.getElementById('providerNameDisplay').textContent = '';
             } catch (error) {
-                displayOutput('Error adding appointment: ' + error);
+                displayOutput('Error booking appointment: ' + error);
             }
         });
 
