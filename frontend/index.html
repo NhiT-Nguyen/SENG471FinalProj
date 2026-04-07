@@ -146,6 +146,36 @@
     </div>
 
     <div class="section">
+        <h2>Appointment Notes</h2>
+        <button id="loadAppointmentNotes">Load My Appointments</button>
+        <div id="appointmentNotesList"></div>
+        <form id="editAppointmentNotesForm" style="display: none; margin-top: 20px;">
+            <input type="hidden" id="noteAppointmentId">
+            <textarea id="noteReasons" placeholder="Reasons for visit" rows="3" style="width: 100%; margin: 5px 0;"></textarea>
+            <textarea id="noteExaminations" placeholder="Examinations performed" rows="3" style="width: 100%; margin: 5px 0;"></textarea>
+            <textarea id="noteTests" placeholder="Tests requested" rows="3" style="width: 100%; margin: 5px 0;"></textarea>
+            <textarea id="noteMedications" placeholder="New medications and instructions" rows="3" style="width: 100%; margin: 5px 0;"></textarea>
+            <textarea id="noteReferrals" placeholder="Referrals" rows="2" style="width: 100%; margin: 5px 0;"></textarea>
+            <label style="display: block; margin: 5px 0;"><input type="checkbox" id="noteFollowUp"> Follow-up recommended</label>
+            <textarea id="noteGeneral" placeholder="General notes" rows="4" style="width: 100%; margin: 5px 0;"></textarea>
+            <button type="submit" style="background: #007bff; color: white; border: none; padding: 10px; cursor: pointer;">Save Appointment Notes</button>
+            <button type="button" id="cancelEditNotesBtn" style="background: #999; color: white; border: none; padding: 10px; cursor: pointer; margin-left: 10px;">Cancel</button>
+        </form>
+        <div id="noteStatus"></div>
+    </div>
+
+    <div class="section">
+        <h2>Appointment History</h2>
+        <div class="history-filters" style="margin-bottom: 15px;">
+            <input type="date" id="historyStartDate">
+            <input type="date" id="historyEndDate">
+            <input type="number" id="historyProviderId" placeholder="Provider ID (optional)">
+            <button id="loadAppointmentHistory">Load Appointment History</button>
+        </div>
+        <div id="appointmentHistoryList"></div>
+    </div>
+
+    <div class="section">
         <h2>Medications</h2>
         <button id="loadMedications">Load Medications</button>
         <form id="addMedicationForm">
@@ -229,9 +259,20 @@
     <script>
         let token = localStorage.getItem('token');
         const baseURL = 'http://127.0.0.1:8000/api';
+        let currentUser = null;
+        let currentUserRole = '';
+        let currentProviderId = null;
 
         function setAuthHeader() {
             return token ? { 'Authorization': `Token ${token}` } : {};
+        }
+
+        function updateRoleState(profile) {
+            currentUser = profile.user || null;
+            currentUserRole = profile.role || '';
+            if (currentUserRole === 'healthcare_provider' && currentUser) {
+                currentProviderId = currentUser.id;
+            }
         }
 
         function displayOutput(text) {
@@ -283,6 +324,7 @@
                     document.getElementById('profileLastName').value = data.user.last_name || '';
                     document.getElementById('profileEmail').value = data.user.email || '';
                     document.getElementById('profileRole').value = data.role || '';
+                    updateRoleState(data);
                 }
             } catch (error) {
                 displayOutput('Error loading profile: ' + error);
@@ -385,17 +427,19 @@
             
             html += '<ul>';
             providers.forEach(provider => {
-                const name = provider.user_name || 'Unknown';
+                const user = provider.user || provider;
+                const name = user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : user?.username || provider.user_name || 'Unknown';
                 const specialty = provider.specialty_display || provider.specialty || 'N/A';
                 const bio = provider.bio || '';
                 const clinic = provider.hospital_clinic || 'N/A';
+                const providerId = user?.id || provider.user_id || provider.id || provider.healthcare_provider || 0;
                 html += `
                     <li>
                         <strong>${name}</strong> - ${specialty}
                         <p>Clinic: ${clinic}</p>
                         <p>${bio}</p>
-                        <button onclick="viewProviderAvailability(${provider.user_id})">View Full Availability</button>
-                        <button onclick="bookAppointmentWithProvider(${provider.user_id}, '${name}')">Book Appointment</button>
+                        <button onclick="viewProviderAvailability(${providerId}, '${name}')">View Full Availability</button>
+                        <button onclick="bookAppointmentWithProvider(${providerId}, '${name}')">Book Appointment</button>
                     </li>
                 `;
             });
@@ -405,15 +449,13 @@
 
         window.viewProviderAvailability = async function(providerId, providerName) {
             try {
-                const response = await fetch(`${baseURL}/appointments/availabilities/?healthcare_provider=${providerId}`, {
+                const response = await fetch(`${baseURL}/appointments/availabilities/provider_availability/?provider_id=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
                 let availHtml = `<h3>Available Time Slots for ${providerName}</h3>`;
                 
-                // Filter only "available" status or is_available = true
-                const availableSlots = data.filter(avail => avail.status === 'available' || avail.is_available);
-                
+                const availableSlots = Array.isArray(data) ? data : [];
                 if (availableSlots.length === 0) {
                     availHtml += '<p>No available time slots.</p>';
                 } else {
@@ -671,27 +713,12 @@
         // Manage Appointment Requests (Healthcare Provider)
         document.getElementById('loadPendingRequests').addEventListener('click', async () => {
             try {
-                // Get current user's provider ID - you may need to adjust this to get the actual logged-in provider ID
-                const profileResponse = await fetch(`${baseURL}/auth/profiles/`, {
-                    headers: setAuthHeader()
-                });
-                const profiles = await profileResponse.json();
-                let currentProviderId = null;
-                
-                // Find the healthcare_provider profile for the current user
-                for (let profile of profiles) {
-                    if (profile.role === 'healthcare_provider') {
-                        currentProviderId = profile.user.id;
-                        break;
-                    }
-                }
-                
+                const providerId = currentProviderId || 1;
                 if (!currentProviderId) {
                     document.getElementById('pendingRequestsList').innerHTML = '<p>You are not a healthcare provider or your profile could not be found.</p>';
                     return;
                 }
-                
-                const response = await fetch(`${baseURL}/appointments/appointment-requests/pending-requests/?provider_id=${currentProviderId}`, {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/pending-requests/?provider_id=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -762,22 +789,12 @@
 
         document.getElementById('loadPendingChangeRequests').addEventListener('click', async () => {
             try {
-                const profileResponse = await fetch(`${baseURL}/auth/profiles/`, {
-                    headers: setAuthHeader()
-                });
-                const profiles = await profileResponse.json();
-                let currentProviderId = null;
-                for (let profile of profiles) {
-                    if (profile.role === 'healthcare_provider') {
-                        currentProviderId = profile.user.id;
-                        break;
-                    }
-                }
+                const providerId = currentProviderId || 1;
                 if (!currentProviderId) {
                     document.getElementById('pendingChangeRequestsList').innerHTML = '<p>You are not a healthcare provider or your profile could not be found.</p>';
                     return;
                 }
-                const response = await fetch(`${baseURL}/appointments/appointment-requests/pending-change-requests/?provider_id=${currentProviderId}`, {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/pending-change-requests/?provider_id=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -842,6 +859,156 @@
                 displayOutput('Error declining request changes: ' + error);
             }
         };
+
+        document.getElementById('loadAppointmentNotes').addEventListener('click', async () => {
+            if (!currentUserRole || currentUserRole !== 'healthcare_provider') {
+                displayOutput('Only healthcare providers can load and edit appointment notes here.');
+                return;
+            }
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointments/history/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                const container = document.getElementById('appointmentNotesList');
+                container.innerHTML = '';
+                const title = document.createElement('h3');
+                title.textContent = 'My Appointments';
+                container.appendChild(title);
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    const emptyMessage = document.createElement('p');
+                    emptyMessage.textContent = 'No appointments found.';
+                    container.appendChild(emptyMessage);
+                    return;
+                }
+
+                const list = document.createElement('ul');
+                list.style.listStyle = 'none';
+                list.style.padding = '0';
+
+                data.forEach(appt => {
+                    const item = document.createElement('li');
+                    item.style.border = '1px solid #ddd';
+                    item.style.padding = '15px';
+                    item.style.margin = '10px 0';
+                    item.style.borderRadius = '5px';
+
+                    item.innerHTML = `
+                        <strong>Patient:</strong> ${appt.patient_name || 'N/A'}<br>
+                        <strong>Date:</strong> ${appt.date}<br>
+                        <strong>Time:</strong> ${appt.time}<br>
+                        <strong>Notes:</strong> ${appt.notes || 'None'}<br>
+                        <strong>New Medications:</strong> ${appt.new_medications || 'None'}<br>
+                    `;
+
+                    const button = document.createElement('button');
+                    button.textContent = 'Edit Notes';
+                    button.style.background = '#007bff';
+                    button.style.color = 'white';
+                    button.style.border = 'none';
+                    button.style.cursor = 'pointer';
+                    button.style.padding = '5px 10px';
+                    button.style.marginTop = '5px';
+                    button.addEventListener('click', () => editAppointmentNotes(appt.id, appt));
+
+                    item.appendChild(button);
+                    list.appendChild(item);
+                });
+
+                container.appendChild(list);
+            } catch (error) {
+                displayOutput('Error loading appointment notes: ' + error);
+            }
+        });
+
+        window.editAppointmentNotes = function(appointmentId, appointment) {
+            document.getElementById('noteAppointmentId').value = appointmentId;
+            document.getElementById('noteReasons').value = appointment.reasons_for_visit || '';
+            document.getElementById('noteExaminations').value = appointment.examinations_performed || '';
+            document.getElementById('noteTests').value = appointment.tests_requested || '';
+            document.getElementById('noteMedications').value = appointment.new_medications || '';
+            document.getElementById('noteReferrals').value = appointment.referrals || '';
+            document.getElementById('noteFollowUp').checked = appointment.follow_up_recommended || false;
+            document.getElementById('noteGeneral').value = appointment.notes || '';
+            document.getElementById('editAppointmentNotesForm').style.display = 'block';
+            document.getElementById('noteStatus').textContent = '';
+            document.getElementById('editAppointmentNotesForm').scrollIntoView({ behavior: 'smooth' });
+        };
+
+        document.getElementById('editAppointmentNotesForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const appointmentId = document.getElementById('noteAppointmentId').value;
+            const payload = {
+                reasons_for_visit: document.getElementById('noteReasons').value,
+                examinations_performed: document.getElementById('noteExaminations').value,
+                tests_requested: document.getElementById('noteTests').value,
+                new_medications: document.getElementById('noteMedications').value,
+                referrals: document.getElementById('noteReferrals').value,
+                follow_up_recommended: document.getElementById('noteFollowUp').checked,
+                notes: document.getElementById('noteGeneral').value
+            };
+            try {
+                const response = await fetch(`${baseURL}/appointments/appointments/${appointmentId}/update_notes/`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('noteStatus').textContent = 'Appointment notes updated successfully.';
+                    document.getElementById('editAppointmentNotesForm').style.display = 'none';
+                    document.getElementById('loadAppointmentNotes').click();
+                } else {
+                    document.getElementById('noteStatus').textContent = 'Error: ' + JSON.stringify(data);
+                }
+            } catch (error) {
+                document.getElementById('noteStatus').textContent = 'Error updating notes: ' + error;
+            }
+        });
+
+        document.getElementById('cancelEditNotesBtn').addEventListener('click', () => {
+            document.getElementById('editAppointmentNotesForm').style.display = 'none';
+            document.getElementById('noteStatus').textContent = '';
+        });
+
+        document.getElementById('loadAppointmentHistory').addEventListener('click', async () => {
+            try {
+                let url = `${baseURL}/appointments/appointments/history/?`;
+                const startDate = document.getElementById('historyStartDate').value;
+                const endDate = document.getElementById('historyEndDate').value;
+                const providerId = document.getElementById('historyProviderId').value;
+                if (startDate) url += `start_date=${startDate}&`;
+                if (endDate) url += `end_date=${endDate}&`;
+                if (providerId) url += `provider_id=${providerId}&`;
+                const response = await fetch(url, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                let html = '<h3>Appointment History</h3>';
+                if (!Array.isArray(data) || data.length === 0) {
+                    html += '<p>No history available.</p>';
+                } else {
+                    html += '<ul style="list-style: none; padding: 0;">';
+                    data.forEach(appt => {
+                        html += `
+                            <li style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px;">
+                                ${appt.provider_name ? `<strong>Provider:</strong> ${appt.provider_name}<br>` : ''}
+                                ${appt.patient_name ? `<strong>Patient:</strong> ${appt.patient_name}<br>` : ''}
+                                <strong>Date:</strong> ${appt.date}<br>
+                                <strong>Time:</strong> ${appt.time}<br>
+                                <strong>Notes:</strong> ${appt.notes || 'None'}<br>
+                                <strong>New Medications:</strong> ${appt.new_medications || 'None'}<br>
+                            </li>
+                        `;
+                    });
+                    html += '</ul>';
+                }
+                document.getElementById('appointmentHistoryList').innerHTML = html;
+            } catch (error) {
+                displayOutput('Error loading appointment history: ' + error);
+            }
+        });
 
         // Medications
         document.getElementById('loadMedications').addEventListener('click', async () => {
@@ -982,7 +1149,8 @@
         // Availability
         document.getElementById('loadAvailabilities').addEventListener('click', async () => {
             try {
-                const response = await fetch(`${baseURL}/appointments/availabilities/?provider_id=1`, {  // Assuming provider id 1
+                const providerId = currentProviderId || 1;
+                const response = await fetch(`${baseURL}/appointments/availabilities/provider_availability/?provider_id=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -994,6 +1162,7 @@
 
         document.getElementById('addAvailabilityForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const providerId = currentProviderId || 1;
             const day_of_week = document.getElementById('availDayOfWeek').value;
             const start_time = document.getElementById('availStartTime').value;
             const end_time = document.getElementById('availEndTime').value;
@@ -1002,7 +1171,7 @@
                 const response = await fetch(`${baseURL}/appointments/availabilities/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
-                    body: JSON.stringify({ healthcare_provider: 1, day_of_week, start_time, end_time, is_recurring })  // Assuming healthcare_provider id 1
+                    body: JSON.stringify({ healthcare_provider: providerId, day_of_week, start_time, end_time, is_recurring })
                 });
                 const data = await response.json();
                 displayOutput('Availability added: ' + JSON.stringify(data));
@@ -1015,7 +1184,8 @@
         // Confirmations
         document.getElementById('loadConfirmations').addEventListener('click', async () => {
             try {
-                const response = await fetch(`${baseURL}/appointments/availability-confirmations/pending-confirmations/?provider_id=1`, {  // Assuming provider id 1
+                const providerId = currentProviderId || 1;
+                const response = await fetch(`${baseURL}/appointments/availability-confirmations/pending-confirmations/?provider_id=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -1027,8 +1197,8 @@
 
         document.getElementById('confirmWeek').addEventListener('click', async () => {
             try {
-                // First get the pending confirmation
-                const response = await fetch(`${baseURL}/appointments/availability-confirmations/pending-confirmations/?provider_id=1`, {
+                const providerId = currentProviderId || 1;
+                const response = await fetch(`${baseURL}/appointments/availability-confirmations/pending-confirmations/?provider_id=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
