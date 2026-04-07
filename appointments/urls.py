@@ -4,6 +4,8 @@ from . import views
 
 router = DefaultRouter()
 router.register(r'appointments', views.AppointmentViewSet)
+router.register(r'availabilities', views.AvailabilityViewSet)
+router.register(r'availability-confirmations', views.AvailabilityConfirmationViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
