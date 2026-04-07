@@ -6,6 +6,7 @@ from django.utils.dateparse import parse_date, parse_time
 from datetime import timedelta, datetime
 from django.db.models import Q
 from .models import Appointment, Availability, AvailabilityConfirmation, AppointmentRequest
+from notifications.models import Alert
 from .serializers import AppointmentSerializer, AvailabilitySerializer, AvailabilityConfirmationSerializer, AvailabilityWithProviderSerializer, AppointmentRequestSerializer
 from authentication.models import HealthcareProvider, Patient
 from authentication.serializers import HealthcareProviderDetailSerializer
@@ -188,15 +189,18 @@ class AppointmentRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def pending_requests(self, request):
-        """Get pending appointment requests for a provider"""
+        """Get pending appointment requests for a provider."""
         provider_id = request.query_params.get('provider_id')
-        if not provider_id:
-            return Response({'error': 'provider_id required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        pending = self.queryset.filter(
-            healthcare_provider_id=provider_id,
-            status='pending'
-        )
+        if provider_id:
+            pending = self.queryset.filter(
+                healthcare_provider_id=provider_id,
+                status='pending'
+            )
+        else:
+            pending = self.queryset.filter(
+                healthcare_provider=request.user,
+                status='pending'
+            )
         serializer = self.get_serializer(pending, many=True)
         return Response(serializer.data)
 
@@ -264,6 +268,10 @@ class AppointmentRequestViewSet(viewsets.ModelViewSet):
         appointment_request.resolved_at = timezone.now()
         appointment_request.save()
         self._update_availability_on_approval(appointment_request)
+        self._notify_requesters(
+            appointment_request,
+            f"Your appointment request for {appointment_request.requested_date} {appointment_request.requested_start_time}-{appointment_request.requested_end_time} has been approved."
+        )
 
         serializer = self.get_serializer(appointment_request)
         return Response({
@@ -285,6 +293,10 @@ class AppointmentRequestViewSet(viewsets.ModelViewSet):
         appointment_request.resolved_at = timezone.now()
         appointment_request.save()
         self._revert_availability_on_rejection(appointment_request)
+        self._notify_requesters(
+            appointment_request,
+            f"Your appointment request for {appointment_request.requested_date} {appointment_request.requested_start_time}-{appointment_request.requested_end_time} has been denied."
+        )
 
         serializer = self.get_serializer(appointment_request)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -578,11 +590,25 @@ class AppointmentRequestViewSet(viewsets.ModelViewSet):
         week_start = appointment_request.requested_date - timedelta(
             days=appointment_request.requested_date.weekday()
         )
-        Availability.objects.filter(
+        availability = Availability.objects.filter(
             healthcare_provider=appointment_request.healthcare_provider,
             day_of_week=day_of_week,
             start_time=appointment_request.requested_start_time,
             end_time=appointment_request.requested_end_time,
             week_start_date=week_start,
             status='appointment_request_pending'
-        ).delete()
+        ).first()
+        if availability:
+            availability.status = 'available'
+            availability.is_available = True
+            availability.save()
+
+    def _notify_requesters(self, appointment_request, message):
+        recipients = set()
+        if appointment_request.patient.user:
+            recipients.add(appointment_request.patient.user)
+        for family_member in appointment_request.patient.family_members.all():
+            recipients.add(family_member)
+
+        for user in recipients:
+            Alert.objects.create(user=user, message=message)
