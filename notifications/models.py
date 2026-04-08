@@ -20,6 +20,10 @@ class NotificationSettings(models.Model):
     profile_change_notification_email = models.BooleanField(default=True)
     profile_change_notification_sms = models.BooleanField(default=False)
     profile_change_notification_push = models.BooleanField(default=True)
+    new_prescription_notification_enabled = models.BooleanField(default=True)
+    new_prescription_notification_email = models.BooleanField(default=True)
+    new_prescription_notification_sms = models.BooleanField(default=False)
+    new_prescription_notification_push = models.BooleanField(default=True)
 
     def __str__(self):
         return f"Settings for {self.user.username}"
