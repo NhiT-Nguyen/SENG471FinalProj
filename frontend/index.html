@@ -208,28 +208,39 @@
 
     <div class="section">
         <h2>Medications</h2>
-        <button id="loadMedications">Load Medications</button>
-        <form id="addMedicationForm">
-            <input type="number" id="medPatientId" placeholder="Patient ID" required>
-            <input type="text" id="medName" placeholder="Medication Name" required>
-            <input type="text" id="medDosage" placeholder="Dosage" required>
-            <input type="text" id="medSchedule" placeholder="Schedule" required>
-            <input type="date" id="medStartDate" required>
-            <button type="submit">Add Medication</button>
-        </form>
-        <h3>Refill Reminder</h3>
-        <form id="setRefillReminderForm">
-            <input type="number" id="reminderMedicationId" placeholder="Medication ID" required>
-            <input type="date" id="refillReminderDate" placeholder="Refill Date">
-            <input type="number" id="refillReminderDaysBefore" placeholder="Days Before" min="0" value="7">
-            <label><input type="checkbox" id="refillReminderEnabled" checked> Enable Refill Reminder</label>
-            <button type="submit">Set / Update Refill Reminder</button>
-        </form>
-        <form id="clearRefillReminderForm">
-            <input type="number" id="clearReminderMedicationId" placeholder="Medication ID" required>
-            <button type="submit">Remove Refill Reminder</button>
-        </form>
+        <button id="loadMedications">Load My Medications/Prescriptions</button>
         <div id="medicationsList"></div>
+        
+        <h3>Prescribe Medication (Healthcare Providers Only)</h3>
+        <form id="prescribeMedicationForm">
+            <input type="number" id="prescPatientId" placeholder="Patient ID" required>
+            <input type="text" id="prescName" placeholder="Medication Name" required>
+            <input type="text" id="prescDosage" placeholder="Dosage" required>
+            <input type="text" id="prescFrequency" placeholder="Frequency (e.g., twice daily)" required>
+            <input type="date" id="prescStartDate" required>
+            <input type="date" id="prescEndDate" placeholder="End Date (optional)">
+            <textarea id="prescInstructions" placeholder="Administration Instructions"></textarea>
+            <button type="submit">Prescribe Medication</button>
+        </form>
+        <div id="prescribeStatus"></div>
+
+        <h3>Update Prescription</h3>
+        <form id="updateMedicationForm">
+            <input type="number" id="updateMedId" placeholder="Medication ID" required>
+            <input type="text" id="updateDosage" placeholder="New Dosage">
+            <input type="text" id="updateFrequency" placeholder="New Frequency">
+            <input type="date" id="updateEndDate" placeholder="New End Date">
+            <textarea id="updateInstructions" placeholder="New Administration Instructions"></textarea>
+            <button type="submit">Update Prescription</button>
+        </form>
+        <div id="updateStatus"></div>
+
+        <h3>Discontinue Prescription</h3>
+        <form id="discontinueMedicationForm">
+            <input type="number" id="discontinueMedId" placeholder="Medication ID" required>
+            <button type="submit">Discontinue Prescription</button>
+        </form>
+        <div id="discontinueStatus"></div>
     </div>
 
     <div class="section">
@@ -1136,75 +1147,107 @@
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
-                document.getElementById('medicationsList').textContent = JSON.stringify(data, null, 2);
+                let html = '<ul>';
+                data.forEach(med => {
+                    html += `<li>
+                        <strong>Patient:</strong> ${med.patient_name}<br>
+                        <strong>Medication:</strong> ${med.name}<br>
+                        <strong>Dosage:</strong> ${med.dosage}<br>
+                        <strong>Frequency:</strong> ${med.frequency}<br>
+                        <strong>Start Date:</strong> ${med.start_date}<br>
+                        <strong>End Date:</strong> ${med.end_date || 'Ongoing'}<br>
+                        <strong>Instructions:</strong> ${med.administration_instructions || 'None'}<br>
+                        <strong>Status:</strong> ${med.status}<br>
+                        <strong>Prescribed By:</strong> ${med.prescribed_by_name}<br>
+                        <strong>Prescribed Date:</strong> ${new Date(med.prescribed_date).toLocaleString()}
+                    </li>`;
+                });
+                html += '</ul>';
+                document.getElementById('medicationsList').innerHTML = html;
             } catch (error) {
                 displayOutput('Error loading medications: ' + error);
             }
         });
 
-        document.getElementById('addMedicationForm').addEventListener('submit', async (e) => {
+        document.getElementById('prescribeMedicationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const patient = document.getElementById('medPatientId').value;
-            const name = document.getElementById('medName').value;
-            const dosage = document.getElementById('medDosage').value;
-            const schedule = document.getElementById('medSchedule').value;
-            const start_date = document.getElementById('medStartDate').value;
+            const patient = document.getElementById('prescPatientId').value;
+            const name = document.getElementById('prescName').value;
+            const dosage = document.getElementById('prescDosage').value;
+            const frequency = document.getElementById('prescFrequency').value;
+            const start_date = document.getElementById('prescStartDate').value;
+            const end_date = document.getElementById('prescEndDate').value || null;
+            const administration_instructions = document.getElementById('prescInstructions').value;
             try {
                 const response = await fetch(`${baseURL}/medications/medications/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
-                    body: JSON.stringify({ patient, name, dosage, schedule, start_date })
-                });
-                const data = await response.json();
-                displayOutput('Medication added: ' + JSON.stringify(data));
-                document.getElementById('loadMedications').click();
-            } catch (error) {
-                displayOutput('Error adding medication: ' + error);
-            }
-        });
-
-        document.getElementById('setRefillReminderForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const medicationId = document.getElementById('reminderMedicationId').value;
-            const refill_reminder_enabled = document.getElementById('refillReminderEnabled').checked;
-            const refill_reminder_date = document.getElementById('refillReminderDate').value;
-            const refill_reminder_days_before = parseInt(document.getElementById('refillReminderDaysBefore').value, 10) || 7;
-
-            try {
-                const response = await fetch(`${baseURL}/medications/medications/${medicationId}/set_refill_reminder/`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
-                    body: JSON.stringify({ refill_reminder_enabled, refill_reminder_date, refill_reminder_days_before })
+                    body: JSON.stringify({ patient, name, dosage, frequency, start_date, end_date, administration_instructions })
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    displayOutput('Refill reminder updated: ' + JSON.stringify(data));
+                    document.getElementById('prescribeStatus').textContent = 'Medication prescribed successfully';
+                    document.getElementById('prescribeMedicationForm').reset();
+                    document.getElementById('loadMedications').click();
                 } else {
-                    displayOutput('Error setting refill reminder: ' + JSON.stringify(data));
+                    document.getElementById('prescribeStatus').textContent = 'Error: ' + JSON.stringify(data);
                 }
-                document.getElementById('loadMedications').click();
             } catch (error) {
-                displayOutput('Error setting refill reminder: ' + error);
+                displayOutput('Error prescribing medication: ' + error);
             }
         });
 
-        document.getElementById('clearRefillReminderForm').addEventListener('submit', async (e) => {
+        document.getElementById('updateMedicationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const medicationId = document.getElementById('clearReminderMedicationId').value;
+            const medId = document.getElementById('updateMedId').value;
+            const dosage = document.getElementById('updateDosage').value;
+            const frequency = document.getElementById('updateFrequency').value;
+            const end_date = document.getElementById('updateEndDate').value;
+            const administration_instructions = document.getElementById('updateInstructions').value;
+            
+            const updateData = {};
+            if (dosage) updateData.dosage = dosage;
+            if (frequency) updateData.frequency = frequency;
+            if (end_date) updateData.end_date = end_date;
+            if (administration_instructions) updateData.administration_instructions = administration_instructions;
+
             try {
-                const response = await fetch(`${baseURL}/medications/medications/${medicationId}/clear_refill_reminder/`, {
+                const response = await fetch(`${baseURL}/medications/medications/${medId}/`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify(updateData)
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('updateStatus').textContent = 'Prescription updated successfully';
+                    document.getElementById('updateMedicationForm').reset();
+                    document.getElementById('loadMedications').click();
+                } else {
+                    document.getElementById('updateStatus').textContent = 'Error: ' + JSON.stringify(data);
+                }
+            } catch (error) {
+                displayOutput('Error updating prescription: ' + error);
+            }
+        });
+
+        document.getElementById('discontinueMedicationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const medId = document.getElementById('discontinueMedId').value;
+            try {
+                const response = await fetch(`${baseURL}/medications/medications/${medId}/discontinue/`, {
                     method: 'POST',
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    displayOutput('Refill reminder removed: ' + JSON.stringify(data));
+                    document.getElementById('discontinueStatus').textContent = 'Prescription discontinued successfully';
+                    document.getElementById('discontinueMedicationForm').reset();
+                    document.getElementById('loadMedications').click();
                 } else {
-                    displayOutput('Error removing refill reminder: ' + JSON.stringify(data));
+                    document.getElementById('discontinueStatus').textContent = 'Error: ' + JSON.stringify(data);
                 }
-                document.getElementById('loadMedications').click();
             } catch (error) {
-                displayOutput('Error removing refill reminder: ' + error);
+                displayOutput('Error discontinuing prescription: ' + error);
             }
         });
 
