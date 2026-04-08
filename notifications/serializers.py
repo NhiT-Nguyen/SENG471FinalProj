@@ -20,6 +20,10 @@ class NotificationSettingsSerializer(serializers.ModelSerializer):
             'medication_reminder_sms',
             'medication_reminder_push',
             'medication_reminder_minutes_before',
+            'profile_change_notification_enabled',
+            'profile_change_notification_email',
+            'profile_change_notification_sms',
+            'profile_change_notification_push',
         ]
         read_only_fields = ['id', 'user']
 

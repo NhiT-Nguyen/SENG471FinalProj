@@ -382,6 +382,15 @@
                     </select>
                 </label>
             </div>
+            <div class="settings-subsection">
+                <h3>Profile Change Notification Preferences</h3>
+                <div class="settings-grid">
+                    <label><input type="checkbox" id="profileChangeNotificationEnabled"> Enable profile change notifications</label>
+                    <label><input type="checkbox" id="profileChangeNotificationEmail"> Notification by email</label>
+                    <label><input type="checkbox" id="profileChangeNotificationSms"> Notification by SMS</label>
+                    <label><input type="checkbox" id="profileChangeNotificationPush"> Notification by push</label>
+                </div>
+            </div>
             <div id="notificationSettingsStatus" style="margin-top: 10px;"></div>
         </div>
         <div id="alertsList"></div>
@@ -1699,7 +1708,11 @@
                 medication_reminder_email: document.getElementById('medicationReminderEmail').checked,
                 medication_reminder_sms: document.getElementById('medicationReminderSms').checked,
                 medication_reminder_push: document.getElementById('medicationReminderPush').checked,
-                medication_reminder_minutes_before: parseInt(document.getElementById('medicationReminderMinutesBefore').value, 10)
+                medication_reminder_minutes_before: parseInt(document.getElementById('medicationReminderMinutesBefore').value, 10),
+                profile_change_notification_enabled: document.getElementById('profileChangeNotificationEnabled').checked,
+                profile_change_notification_email: document.getElementById('profileChangeNotificationEmail').checked,
+                profile_change_notification_sms: document.getElementById('profileChangeNotificationSms').checked,
+                profile_change_notification_push: document.getElementById('profileChangeNotificationPush').checked
             };
 
             try {
@@ -1734,6 +1747,10 @@
             document.getElementById('medicationReminderSms').checked = !!data.medication_reminder_sms;
             document.getElementById('medicationReminderPush').checked = !!data.medication_reminder_push;
             document.getElementById('medicationReminderMinutesBefore').value = String(data.medication_reminder_minutes_before || 30);
+            document.getElementById('profileChangeNotificationEnabled').checked = !!data.profile_change_notification_enabled;
+            document.getElementById('profileChangeNotificationEmail').checked = !!data.profile_change_notification_email;
+            document.getElementById('profileChangeNotificationSms').checked = !!data.profile_change_notification_sms;
+            document.getElementById('profileChangeNotificationPush').checked = !!data.profile_change_notification_push;
         }
 
         document.getElementById('loadAlerts').addEventListener('click', async () => {
