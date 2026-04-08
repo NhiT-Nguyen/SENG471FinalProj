@@ -6,6 +6,11 @@ class NotificationSettings(models.Model):
     email_alerts = models.BooleanField(default=True)
     sms_alerts = models.BooleanField(default=False)
     push_notifications = models.BooleanField(default=True)
+    appointment_reminder_enabled = models.BooleanField(default=True)
+    appointment_reminder_email = models.BooleanField(default=True)
+    appointment_reminder_sms = models.BooleanField(default=False)
+    appointment_reminder_push = models.BooleanField(default=True)
+    appointment_reminder_hours_before = models.PositiveIntegerField(default=24)
 
     def __str__(self):
         return f"Settings for {self.user.username}"
