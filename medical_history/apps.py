@@ -1,7 +1,6 @@
 from django.apps import AppConfig
 
 
-class MessagesConfig(AppConfig):
+class MedicalHistoryConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'messages'
-    label = 'custom_messages'
+    name = 'medical_history'
