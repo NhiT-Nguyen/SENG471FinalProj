@@ -24,6 +24,10 @@ class NotificationSettingsSerializer(serializers.ModelSerializer):
             'profile_change_notification_email',
             'profile_change_notification_sms',
             'profile_change_notification_push',
+            'new_prescription_notification_enabled',
+            'new_prescription_notification_email',
+            'new_prescription_notification_sms',
+            'new_prescription_notification_push',
         ]
         read_only_fields = ['id', 'user']
 
