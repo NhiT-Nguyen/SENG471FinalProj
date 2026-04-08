@@ -217,6 +217,7 @@
 
     <div class="section">
         <h2>Medications</h2>
+        <button id="loadCurrentMedications">Load My Current Medications</button>
         <button id="loadMedications">Load My Medication History</button>
         
         <div class="medication-filters" style="margin: 15px 0; padding: 10px; background: #f0f0f0; border-radius: 5px;">
@@ -1158,8 +1159,48 @@
         });
 
         // Medications
+        document.getElementById('loadCurrentMedications').addEventListener('click', loadCurrentMedications);
         document.getElementById('loadMedications').addEventListener('click', loadMedications);
         document.getElementById('applyFilters').addEventListener('click', loadMedications);
+
+        async function loadCurrentMedications() {
+            try {
+                const response = await fetch(`${baseURL}/medications/medications/current/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                
+                let html = '<h3>My Current Medications</h3>';
+                
+                if (data.length > 0) {
+                    html += `<p><strong>Total Current Medications:</strong> ${data.length}</p>`;
+                    html += '<ul>';
+                    data.forEach(med => {
+                        html += `<li class="medication-item active-med">
+                            <div class="medication-header">
+                                <strong>${med.name}</strong> - ${med.dosage}
+                                <span class="status-badge active">${med.status}</span>
+                            </div>
+                            <div class="medication-details">
+                                <strong>Frequency:</strong> ${med.frequency}<br>
+                                <strong>Start Date:</strong> ${med.start_date}<br>
+                                <strong>End Date:</strong> ${med.end_date || 'Ongoing'}<br>
+                                <strong>Prescribed By:</strong> ${med.prescribed_by_name}<br>
+                                <strong>Prescribed Date:</strong> ${new Date(med.prescribed_date).toLocaleString()}<br>
+                                ${med.administration_instructions ? `<strong>Instructions:</strong> ${med.administration_instructions}<br>` : ''}
+                            </div>
+                        </li>`;
+                    });
+                    html += '</ul>';
+                } else {
+                    html += '<p>You currently have no active medications.</p>';
+                }
+                
+                document.getElementById('medicationsList').innerHTML = html;
+            } catch (error) {
+                displayOutput('Error loading current medications: ' + error);
+            }
+        }
 
         async function loadMedications() {
             try {
