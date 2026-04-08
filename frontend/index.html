@@ -22,6 +22,15 @@
         .auth-panel input, .auth-panel select, .auth-panel button { width: calc(100% - 18px); display: block; margin: 8px 0; }
         .auth-status { margin-top: 10px; font-size: 0.95rem; color: #333; }
         #authStatus { margin-top: 10px; font-weight: bold; }
+        .medication-item { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 8px; background: #f9f9f9; }
+        .medication-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .medication-details { font-size: 0.9em; color: #555; }
+        .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; text-transform: uppercase; }
+        .status-badge.active { background: #28a745; color: white; }
+        .status-badge.discontinued { background: #dc3545; color: white; }
+        .status-badge.completed { background: #6c757d; color: white; }
+        .active-med { border-left: 4px solid #28a745; }
+        .past-med { border-left: 4px solid #6c757d; }
     </style>
 </head>
 <body>
@@ -208,7 +217,15 @@
 
     <div class="section">
         <h2>Medications</h2>
-        <button id="loadMedications">Load My Medications/Prescriptions</button>
+        <button id="loadMedications">Load My Medication History</button>
+        
+        <div class="medication-filters" style="margin: 15px 0; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+            <h4>Filter Options</h4>
+            <label><input type="checkbox" id="showActive" checked> Show Active Medications</label>
+            <label><input type="checkbox" id="showPast" checked> Show Past Medications</label>
+            <button id="applyFilters">Apply Filters</button>
+        </div>
+        
         <div id="medicationsList"></div>
         
         <h3>Prescribe Medication (Healthcare Providers Only)</h3>
@@ -1141,33 +1158,98 @@
         });
 
         // Medications
-        document.getElementById('loadMedications').addEventListener('click', async () => {
+        document.getElementById('loadMedications').addEventListener('click', loadMedications);
+        document.getElementById('applyFilters').addEventListener('click', loadMedications);
+
+        async function loadMedications() {
             try {
                 const response = await fetch(`${baseURL}/medications/medications/`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
-                let html = '<ul>';
-                data.forEach(med => {
-                    html += `<li>
-                        <strong>Patient:</strong> ${med.patient_name}<br>
-                        <strong>Medication:</strong> ${med.name}<br>
-                        <strong>Dosage:</strong> ${med.dosage}<br>
-                        <strong>Frequency:</strong> ${med.frequency}<br>
-                        <strong>Start Date:</strong> ${med.start_date}<br>
-                        <strong>End Date:</strong> ${med.end_date || 'Ongoing'}<br>
-                        <strong>Instructions:</strong> ${med.administration_instructions || 'None'}<br>
-                        <strong>Status:</strong> ${med.status}<br>
-                        <strong>Prescribed By:</strong> ${med.prescribed_by_name}<br>
-                        <strong>Prescribed Date:</strong> ${new Date(med.prescribed_date).toLocaleString()}
-                    </li>`;
-                });
-                html += '</ul>';
+                
+                const showActive = document.getElementById('showActive').checked;
+                const showPast = document.getElementById('showPast').checked;
+                
+                // Filter data based on user preferences
+                let filteredData = data;
+                if (!showActive && !showPast) {
+                    filteredData = [];
+                } else if (!showActive) {
+                    filteredData = data.filter(med => med.status !== 'active');
+                } else if (!showPast) {
+                    filteredData = data.filter(med => med.status === 'active');
+                }
+                
+                // Group medications by status
+                const grouped = {
+                    active: filteredData.filter(med => med.status === 'active'),
+                    discontinued: filteredData.filter(med => med.status === 'discontinued'),
+                    completed: filteredData.filter(med => med.status === 'completed')
+                };
+                
+                let html = '<h3>Medication History</h3>';
+                
+                // Add summary
+                const totalCount = filteredData.length;
+                const activeCount = grouped.active.length;
+                const pastCount = pastMeds.length;
+                html += `<p><strong>Total Medications:</strong> ${totalCount} (${activeCount} active, ${pastCount} past)</p>`;
+                
+                // Display active medications first
+                if (grouped.active.length > 0 && showActive) {
+                    html += '<h4>Current Medications</h4><ul>';
+                    grouped.active.forEach(med => {
+                        html += `<li class="medication-item active-med">
+                            <div class="medication-header">
+                                <strong>${med.name}</strong> - ${med.dosage}
+                                <span class="status-badge active">${med.status}</span>
+                            </div>
+                            <div class="medication-details">
+                                <strong>Frequency:</strong> ${med.frequency}<br>
+                                <strong>Start Date:</strong> ${med.start_date}<br>
+                                <strong>End Date:</strong> ${med.end_date || 'Ongoing'}<br>
+                                <strong>Prescribed By:</strong> ${med.prescribed_by_name}<br>
+                                <strong>Prescribed Date:</strong> ${new Date(med.prescribed_date).toLocaleString()}<br>
+                                ${med.administration_instructions ? `<strong>Instructions:</strong> ${med.administration_instructions}<br>` : ''}
+                            </div>
+                        </li>`;
+                    });
+                    html += '</ul>';
+                }
+                
+                // Display past medications
+                const pastMeds = [...grouped.discontinued, ...grouped.completed];
+                if (pastMeds.length > 0 && showPast) {
+                    html += '<h4>Past Medications</h4><ul>';
+                    pastMeds.forEach(med => {
+                        html += `<li class="medication-item past-med">
+                            <div class="medication-header">
+                                <strong>${med.name}</strong> - ${med.dosage}
+                                <span class="status-badge ${med.status}">${med.status}</span>
+                            </div>
+                            <div class="medication-details">
+                                <strong>Frequency:</strong> ${med.frequency}<br>
+                                <strong>Start Date:</strong> ${med.start_date}<br>
+                                <strong>End Date:</strong> ${med.end_date || 'Ongoing'}<br>
+                                <strong>Prescribed By:</strong> ${med.prescribed_by_name}<br>
+                                <strong>Prescribed Date:</strong> ${new Date(med.prescribed_date).toLocaleString()}<br>
+                                ${med.administration_instructions ? `<strong>Instructions:</strong> ${med.administration_instructions}<br>` : ''}
+                            </div>
+                        </li>`;
+                    });
+                    html += '</ul>';
+                }
+                
+                if (filteredData.length === 0) {
+                    html += '<p>No medications found matching your filters.</p>';
+                }
+                
                 document.getElementById('medicationsList').innerHTML = html;
             } catch (error) {
                 displayOutput('Error loading medications: ' + error);
             }
-        });
+        }
 
         document.getElementById('prescribeMedicationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
