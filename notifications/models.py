@@ -16,6 +16,10 @@ class NotificationSettings(models.Model):
     medication_reminder_sms = models.BooleanField(default=False)
     medication_reminder_push = models.BooleanField(default=True)
     medication_reminder_minutes_before = models.PositiveIntegerField(default=30)
+    profile_change_notification_enabled = models.BooleanField(default=True)
+    profile_change_notification_email = models.BooleanField(default=True)
+    profile_change_notification_sms = models.BooleanField(default=False)
+    profile_change_notification_push = models.BooleanField(default=True)
 
     def __str__(self):
         return f"Settings for {self.user.username}"
