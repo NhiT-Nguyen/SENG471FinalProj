@@ -24,7 +24,7 @@ class NotificationSettingsViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'User profile required.'}, status=status.HTTP_403_FORBIDDEN)
 
         if profile.role != 'patient':
-            return Response({'detail': 'Only patients can manage appointment reminder preferences.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'detail': 'Only patients can manage reminder preferences.'}, status=status.HTTP_403_FORBIDDEN)
 
         settings_obj, _ = NotificationSettings.objects.get_or_create(user=request.user)
 
