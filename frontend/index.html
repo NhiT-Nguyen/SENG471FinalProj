@@ -335,7 +335,7 @@
 
     <div class="section">
         <h2>Notifications</h2>
-        <button id="loadNotificationSettings">Load Reminder Preferences</button>
+        <button id="loadNotificationSettings">Load Notification Preferences</button>
         <button id="loadAlerts">Load My Alerts</button>
         <div class="settings-panel" id="notificationSettingsPanel">
             <h3>Appointment Reminder Preferences</h3>
@@ -389,6 +389,15 @@
                     <label><input type="checkbox" id="profileChangeNotificationEmail"> Notification by email</label>
                     <label><input type="checkbox" id="profileChangeNotificationSms"> Notification by SMS</label>
                     <label><input type="checkbox" id="profileChangeNotificationPush"> Notification by push</label>
+                </div>
+            </div>
+            <div class="settings-subsection">
+                <h3>New Prescription Notification Preferences</h3>
+                <div class="settings-grid">
+                    <label><input type="checkbox" id="newPrescriptionNotificationEnabled"> Enable new prescription notifications</label>
+                    <label><input type="checkbox" id="newPrescriptionNotificationEmail"> Notification by email</label>
+                    <label><input type="checkbox" id="newPrescriptionNotificationSms"> Notification by SMS</label>
+                    <label><input type="checkbox" id="newPrescriptionNotificationPush"> Notification by push</label>
                 </div>
             </div>
             <div id="notificationSettingsStatus" style="margin-top: 10px;"></div>
@@ -1687,7 +1696,7 @@
                     return;
                 }
                 renderNotificationSettings(data);
-                document.getElementById('notificationSettingsStatus').textContent = 'Reminder preferences loaded.';
+                document.getElementById('notificationSettingsStatus').textContent = 'Notification preferences loaded.';
             } catch (error) {
                 displayOutput('Error loading reminder preferences: ' + error);
             }
@@ -1712,7 +1721,11 @@
                 profile_change_notification_enabled: document.getElementById('profileChangeNotificationEnabled').checked,
                 profile_change_notification_email: document.getElementById('profileChangeNotificationEmail').checked,
                 profile_change_notification_sms: document.getElementById('profileChangeNotificationSms').checked,
-                profile_change_notification_push: document.getElementById('profileChangeNotificationPush').checked
+                profile_change_notification_push: document.getElementById('profileChangeNotificationPush').checked,
+                new_prescription_notification_enabled: document.getElementById('newPrescriptionNotificationEnabled').checked,
+                new_prescription_notification_email: document.getElementById('newPrescriptionNotificationEmail').checked,
+                new_prescription_notification_sms: document.getElementById('newPrescriptionNotificationSms').checked,
+                new_prescription_notification_push: document.getElementById('newPrescriptionNotificationPush').checked
             };
 
             try {
@@ -1724,7 +1737,7 @@
                 const data = await response.json();
                 if (response.ok) {
                     renderNotificationSettings(data);
-                    document.getElementById('notificationSettingsStatus').textContent = 'Reminder preferences saved.';
+                    document.getElementById('notificationSettingsStatus').textContent = 'Notification preferences saved.';
                 } else {
                     document.getElementById('notificationSettingsStatus').textContent = 'Error: ' + JSON.stringify(data);
                 }
@@ -1751,6 +1764,10 @@
             document.getElementById('profileChangeNotificationEmail').checked = !!data.profile_change_notification_email;
             document.getElementById('profileChangeNotificationSms').checked = !!data.profile_change_notification_sms;
             document.getElementById('profileChangeNotificationPush').checked = !!data.profile_change_notification_push;
+            document.getElementById('newPrescriptionNotificationEnabled').checked = !!data.new_prescription_notification_enabled;
+            document.getElementById('newPrescriptionNotificationEmail').checked = !!data.new_prescription_notification_email;
+            document.getElementById('newPrescriptionNotificationSms').checked = !!data.new_prescription_notification_sms;
+            document.getElementById('newPrescriptionNotificationPush').checked = !!data.new_prescription_notification_push;
         }
 
         document.getElementById('loadAlerts').addEventListener('click', async () => {

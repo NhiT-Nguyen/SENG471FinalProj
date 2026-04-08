@@ -36,6 +36,8 @@ class NotificationSettingsTests(TestCase):
 		self.assertEqual(response.data['medication_reminder_minutes_before'], 30)
 		self.assertTrue(response.data['profile_change_notification_enabled'])
 		self.assertTrue(response.data['profile_change_notification_email'])
+		self.assertTrue(response.data['new_prescription_notification_enabled'])
+		self.assertTrue(response.data['new_prescription_notification_email'])
 		self.assertEqual(NotificationSettings.objects.filter(user=self.patient_user).count(), 1)
 
 	def test_patient_can_update_reminder_preferences(self):
@@ -58,6 +60,10 @@ class NotificationSettingsTests(TestCase):
 				'profile_change_notification_email': False,
 				'profile_change_notification_sms': True,
 				'profile_change_notification_push': False,
+				'new_prescription_notification_enabled': True,
+				'new_prescription_notification_email': False,
+				'new_prescription_notification_sms': True,
+				'new_prescription_notification_push': True,
 			},
 			format='json'
 		)
@@ -72,6 +78,9 @@ class NotificationSettingsTests(TestCase):
 		self.assertTrue(response.data['profile_change_notification_enabled'])
 		self.assertTrue(response.data['profile_change_notification_sms'])
 		self.assertFalse(response.data['profile_change_notification_push'])
+		self.assertTrue(response.data['new_prescription_notification_enabled'])
+		self.assertFalse(response.data['new_prescription_notification_email'])
+		self.assertTrue(response.data['new_prescription_notification_sms'])
 
 		settings_obj = NotificationSettings.objects.get(user=self.patient_user)
 		self.assertTrue(settings_obj.appointment_reminder_sms)
@@ -80,6 +89,8 @@ class NotificationSettingsTests(TestCase):
 		self.assertEqual(settings_obj.medication_reminder_minutes_before, 15)
 		self.assertTrue(settings_obj.profile_change_notification_sms)
 		self.assertFalse(settings_obj.profile_change_notification_push)
+		self.assertTrue(settings_obj.new_prescription_notification_sms)
+		self.assertFalse(settings_obj.new_prescription_notification_email)
 
 	def test_non_patient_cannot_access_reminder_preferences(self):
 		self.client.force_authenticate(user=self.caregiver_user)
