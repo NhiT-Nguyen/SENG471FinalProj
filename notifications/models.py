@@ -11,6 +11,11 @@ class NotificationSettings(models.Model):
     appointment_reminder_sms = models.BooleanField(default=False)
     appointment_reminder_push = models.BooleanField(default=True)
     appointment_reminder_hours_before = models.PositiveIntegerField(default=24)
+    medication_reminder_enabled = models.BooleanField(default=True)
+    medication_reminder_email = models.BooleanField(default=True)
+    medication_reminder_sms = models.BooleanField(default=False)
+    medication_reminder_push = models.BooleanField(default=True)
+    medication_reminder_minutes_before = models.PositiveIntegerField(default=30)
 
     def __str__(self):
         return f"Settings for {self.user.username}"
