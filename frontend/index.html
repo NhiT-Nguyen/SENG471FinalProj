@@ -285,6 +285,25 @@
         <div id="confirmationsList"></div>
     </div>
 
+    <div class="section">
+        <h2>Messages</h2>
+        <button id="loadMessages">Load My Messages</button>
+        <button id="loadUnreadMessages">Load Unread Messages</button>
+        <div id="messagesList"></div>
+        <form id="sendMessageForm">
+            <input type="number" id="messageReceiver" placeholder="Receiver User ID" required>
+            <textarea id="messageContent" placeholder="Message content" required></textarea>
+            <button type="submit">Send Message</button>
+        </form>
+        <div id="sendMessageStatus"></div>
+    </div>
+
+    <div class="section">
+        <h2>Notifications</h2>
+        <button id="loadAlerts">Load My Alerts</button>
+        <div id="alertsList"></div>
+    </div>
+
     <div id="output"></div>
 
     <script>
@@ -1318,6 +1337,132 @@
                 displayOutput('Error confirming week: ' + error);
             }
         });
+
+        // Messages
+        document.getElementById('loadMessages').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/messages/messages/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                let html = '<ul>';
+                data.forEach(msg => {
+                    html += `<li>
+                        <strong>From:</strong> ${msg.sender_username} <strong>To:</strong> ${msg.receiver_username}<br>
+                        <strong>Message:</strong> ${msg.content}<br>
+                        <strong>Sent:</strong> ${new Date(msg.created_at).toLocaleString()}<br>
+                        <strong>Read:</strong> ${msg.is_read ? 'Yes' : 'No'}
+                        ${!msg.is_read && msg.receiver_username === currentUser.username ? '<button onclick="markAsRead(' + msg.id + ')">Mark as Read</button>' : ''}
+                    </li>`;
+                });
+                html += '</ul>';
+                document.getElementById('messagesList').innerHTML = html;
+            } catch (error) {
+                displayOutput('Error loading messages: ' + error);
+            }
+        });
+
+        document.getElementById('loadUnreadMessages').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/messages/messages/unread/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                let html = '<h3>Unread Messages</h3><ul>';
+                data.forEach(msg => {
+                    html += `<li>
+                        <strong>From:</strong> ${msg.sender_username}<br>
+                        <strong>Message:</strong> ${msg.content}<br>
+                        <strong>Sent:</strong> ${new Date(msg.created_at).toLocaleString()}
+                        <button onclick="markAsRead(${msg.id})">Mark as Read</button>
+                    </li>`;
+                });
+                html += '</ul>';
+                document.getElementById('messagesList').innerHTML = html;
+            } catch (error) {
+                displayOutput('Error loading unread messages: ' + error);
+            }
+        });
+
+        document.getElementById('sendMessageForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const receiver = document.getElementById('messageReceiver').value;
+            const content = document.getElementById('messageContent').value;
+            try {
+                const response = await fetch(`${baseURL}/messages/messages/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...setAuthHeader() },
+                    body: JSON.stringify({ receiver, content })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    document.getElementById('sendMessageStatus').textContent = 'Message sent successfully';
+                    document.getElementById('sendMessageForm').reset();
+                    document.getElementById('loadMessages').click();
+                } else {
+                    document.getElementById('sendMessageStatus').textContent = 'Error: ' + JSON.stringify(data);
+                }
+            } catch (error) {
+                displayOutput('Error sending message: ' + error);
+            }
+        });
+
+        // Notifications/Alerts
+        document.getElementById('loadAlerts').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${baseURL}/notifications/alerts/`, {
+                    headers: setAuthHeader()
+                });
+                const data = await response.json();
+                let html = '<ul>';
+                data.forEach(alert => {
+                    html += `<li>
+                        <strong>Message:</strong> ${alert.message}<br>
+                        <strong>Created:</strong> ${new Date(alert.created_at).toLocaleString()}<br>
+                        <strong>Read:</strong> ${alert.is_read ? 'Yes' : 'No'}
+                        ${!alert.is_read ? '<button onclick="markAlertAsRead(' + alert.id + ')">Mark as Read</button>' : ''}
+                    </li>`;
+                });
+                html += '</ul>';
+                document.getElementById('alertsList').innerHTML = html;
+            } catch (error) {
+                displayOutput('Error loading alerts: ' + error);
+            }
+        });
+
+        // Global function for marking messages as read
+        window.markAsRead = async (messageId) => {
+            try {
+                const response = await fetch(`${baseURL}/messages/messages/${messageId}/mark_as_read/`, {
+                    method: 'POST',
+                    headers: setAuthHeader()
+                });
+                if (response.ok) {
+                    document.getElementById('loadMessages').click();
+                } else {
+                    displayOutput('Error marking message as read');
+                }
+            } catch (error) {
+                displayOutput('Error marking message as read: ' + error);
+            }
+        };
+
+        // Global function for marking alerts as read
+        window.markAlertAsRead = async (alertId) => {
+            try {
+                const response = await fetch(`${baseURL}/notifications/alerts/${alertId}/mark_as_read/`, {
+                    method: 'POST',
+                    headers: setAuthHeader()
+                });
+                if (response.ok) {
+                    document.getElementById('loadAlerts').click();
+                } else {
+                    displayOutput('Error marking alert as read');
+                }
+            } catch (error) {
+                displayOutput('Error marking alert as read: ' + error);
+            }
+        };
 
         // Initialize
         if (token) {
