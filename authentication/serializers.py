@@ -15,11 +15,19 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ['user', 'role']
 
 class PatientSerializer(serializers.ModelSerializer):
-    caregivers = UserSerializer(many=True)
+    caregivers = UserSerializer(many=True, read_only=True)
+    family_members = UserSerializer(many=True, read_only=True)
 
     class Meta:
         model = Patient
-        fields = ['id', 'name', 'date_of_birth', 'caregivers']
+        fields = ['id', 'user', 'name', 'date_of_birth', 'caregivers', 'family_members']
+
+class PatientDetailSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Patient
+        fields = ['id', 'name', 'date_of_birth', 'user']
 
 class HealthcareProviderSerializer(serializers.ModelSerializer):
     user = UserSerializer()

@@ -627,7 +627,7 @@
                 return;
             }
             try {
-                const response = await fetch(`${baseURL}/appointments/availabilities/search-providers/?q=${encodeURIComponent(searchTerm)}`, {
+                const response = await fetch(`${baseURL}/appointments/availabilities/search_providers/?q=${encodeURIComponent(searchTerm)}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -644,7 +644,7 @@
                 return;
             }
             try {
-                const response = await fetch(`${baseURL}/appointments/availabilities/filter-by-specialty/?specialty=${specialty}`, {
+                const response = await fetch(`${baseURL}/appointments/availabilities/filter_by_specialty/?specialty=${specialty}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -662,7 +662,7 @@
                 return;
             }
             try {
-                const response = await fetch(`${baseURL}/appointments/availabilities/available-at-datetime/?date=${date}&time=${time}:00`, {
+                const response = await fetch(`${baseURL}/appointments/availabilities/available_at_datetime/?date=${date}&time=${time}:00`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -885,6 +885,7 @@
         document.getElementById('loadMyRequests').addEventListener('click', async () => {
             try {
                 const response = await fetch(`${baseURL}/appointments/appointment-requests/my_requests/`, {
+
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -977,7 +978,7 @@
                     document.getElementById('pendingRequestsList').innerHTML = '<p>You are not a healthcare provider or your profile could not be found.</p>';
                     return;
                 }
-                const response = await fetch(`${baseURL}/appointments/appointment-requests/pending-requests/?provider_id=${providerId}`, {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/pending_requests/?provider_id=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -1053,7 +1054,7 @@
                     document.getElementById('pendingChangeRequestsList').innerHTML = '<p>You are not a healthcare provider or your profile could not be found.</p>';
                     return;
                 }
-                const response = await fetch(`${baseURL}/appointments/appointment-requests/pending-change-requests/?provider_id=${providerId}`, {
+                const response = await fetch(`${baseURL}/appointments/appointment-requests/pending_change_requests/?provider_id=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -1339,12 +1340,13 @@
                     discontinued: filteredData.filter(med => med.status === 'discontinued'),
                     completed: filteredData.filter(med => med.status === 'completed')
                 };
-                
+
                 let html = '<h3>Medication History</h3>';
-                
+
                 // Add summary
                 const totalCount = filteredData.length;
                 const activeCount = grouped.active.length;
+                const pastMeds = [...grouped.discontinued, ...grouped.completed];
                 const pastCount = pastMeds.length;
                 html += `<p><strong>Total Medications:</strong> ${totalCount} (${activeCount} active, ${pastCount} past)</p>`;
                 
@@ -1371,7 +1373,6 @@
                 }
                 
                 // Display past medications
-                const pastMeds = [...grouped.discontinued, ...grouped.completed];
                 if (pastMeds.length > 0 && showPast) {
                     html += '<h4>Past Medications</h4><ul>';
                     pastMeds.forEach(med => {
@@ -1581,7 +1582,7 @@
         document.getElementById('loadConfirmations').addEventListener('click', async () => {
             try {
                 const providerId = currentProviderId || 1;
-                const response = await fetch(`${baseURL}/appointments/availability-confirmations/pending-confirmations/?provider_id=${providerId}`, {
+                const response = await fetch(`${baseURL}/appointments/availability-confirmations/pending_confirmations/?provider_id=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -1594,7 +1595,7 @@
         document.getElementById('confirmWeek').addEventListener('click', async () => {
             try {
                 const providerId = currentProviderId || 1;
-                const response = await fetch(`${baseURL}/appointments/availability-confirmations/pending-confirmations/?provider_id=${providerId}`, {
+                const response = await fetch(`${baseURL}/appointments/availability-confirmations/pending_confirmations/?provider_id=${providerId}`, {
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
@@ -1830,6 +1831,7 @@
         document.getElementById('loadMyMedicalHistory').addEventListener('click', async () => {
             try {
                 const response = await fetch(`${baseURL}/medical-history/history/my_history/`, {
+
                     headers: setAuthHeader()
                 });
                 const data = await response.json();
