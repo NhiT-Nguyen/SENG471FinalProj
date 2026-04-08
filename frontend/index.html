@@ -36,6 +36,7 @@
         .settings-panel { margin-top: 15px; padding: 15px; background: #fafafa; border: 1px solid #ddd; border-radius: 8px; }
         .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 20px; margin-top: 10px; }
         .settings-grid label { display: flex; align-items: center; gap: 8px; }
+        .settings-subsection { margin-top: 18px; padding-top: 12px; border-top: 1px solid #e5e5e5; }
     </style>
 </head>
 <body>
@@ -361,6 +362,26 @@
                 </label>
                 <button type="submit" style="background: #28a745; color: white; border: none; cursor: pointer;">Save Reminder Preferences</button>
             </form>
+            <div class="settings-subsection">
+                <h3>Medication Reminder Preferences</h3>
+                <div class="settings-grid">
+                    <label><input type="checkbox" id="medicationReminderEnabled"> Enable medication reminders</label>
+                    <label><input type="checkbox" id="medicationReminderEmail"> Reminder by email</label>
+                    <label><input type="checkbox" id="medicationReminderSms"> Reminder by SMS</label>
+                    <label><input type="checkbox" id="medicationReminderPush"> Reminder by push</label>
+                </div>
+                <label style="display: block; margin-top: 10px;">
+                    Reminder timing:
+                    <select id="medicationReminderMinutesBefore">
+                        <option value="5">5 minutes before</option>
+                        <option value="10">10 minutes before</option>
+                        <option value="15">15 minutes before</option>
+                        <option value="30">30 minutes before</option>
+                        <option value="60">1 hour before</option>
+                        <option value="120">2 hours before</option>
+                    </select>
+                </label>
+            </div>
             <div id="notificationSettingsStatus" style="margin-top: 10px;"></div>
         </div>
         <div id="alertsList"></div>
@@ -1673,7 +1694,12 @@
                 appointment_reminder_email: document.getElementById('appointmentReminderEmail').checked,
                 appointment_reminder_sms: document.getElementById('appointmentReminderSms').checked,
                 appointment_reminder_push: document.getElementById('appointmentReminderPush').checked,
-                appointment_reminder_hours_before: parseInt(document.getElementById('appointmentReminderHoursBefore').value, 10)
+                appointment_reminder_hours_before: parseInt(document.getElementById('appointmentReminderHoursBefore').value, 10),
+                medication_reminder_enabled: document.getElementById('medicationReminderEnabled').checked,
+                medication_reminder_email: document.getElementById('medicationReminderEmail').checked,
+                medication_reminder_sms: document.getElementById('medicationReminderSms').checked,
+                medication_reminder_push: document.getElementById('medicationReminderPush').checked,
+                medication_reminder_minutes_before: parseInt(document.getElementById('medicationReminderMinutesBefore').value, 10)
             };
 
             try {
@@ -1703,6 +1729,11 @@
             document.getElementById('appointmentReminderSms').checked = !!data.appointment_reminder_sms;
             document.getElementById('appointmentReminderPush').checked = !!data.appointment_reminder_push;
             document.getElementById('appointmentReminderHoursBefore').value = String(data.appointment_reminder_hours_before || 24);
+            document.getElementById('medicationReminderEnabled').checked = !!data.medication_reminder_enabled;
+            document.getElementById('medicationReminderEmail').checked = !!data.medication_reminder_email;
+            document.getElementById('medicationReminderSms').checked = !!data.medication_reminder_sms;
+            document.getElementById('medicationReminderPush').checked = !!data.medication_reminder_push;
+            document.getElementById('medicationReminderMinutesBefore').value = String(data.medication_reminder_minutes_before || 30);
         }
 
         document.getElementById('loadAlerts').addEventListener('click', async () => {

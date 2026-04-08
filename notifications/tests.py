@@ -32,6 +32,8 @@ class NotificationSettingsTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertTrue(response.data['appointment_reminder_enabled'])
 		self.assertEqual(response.data['appointment_reminder_hours_before'], 24)
+		self.assertTrue(response.data['medication_reminder_enabled'])
+		self.assertEqual(response.data['medication_reminder_minutes_before'], 30)
 		self.assertEqual(NotificationSettings.objects.filter(user=self.patient_user).count(), 1)
 
 	def test_patient_can_update_reminder_preferences(self):
@@ -45,6 +47,11 @@ class NotificationSettingsTests(TestCase):
 				'appointment_reminder_sms': True,
 				'appointment_reminder_push': False,
 				'appointment_reminder_hours_before': 6,
+				'medication_reminder_enabled': True,
+				'medication_reminder_email': False,
+				'medication_reminder_sms': True,
+				'medication_reminder_push': True,
+				'medication_reminder_minutes_before': 15,
 			},
 			format='json'
 		)
@@ -53,10 +60,15 @@ class NotificationSettingsTests(TestCase):
 		self.assertTrue(response.data['appointment_reminder_sms'])
 		self.assertFalse(response.data['appointment_reminder_push'])
 		self.assertEqual(response.data['appointment_reminder_hours_before'], 6)
+		self.assertTrue(response.data['medication_reminder_enabled'])
+		self.assertFalse(response.data['medication_reminder_email'])
+		self.assertEqual(response.data['medication_reminder_minutes_before'], 15)
 
 		settings_obj = NotificationSettings.objects.get(user=self.patient_user)
 		self.assertTrue(settings_obj.appointment_reminder_sms)
 		self.assertEqual(settings_obj.appointment_reminder_hours_before, 6)
+		self.assertTrue(settings_obj.medication_reminder_sms)
+		self.assertEqual(settings_obj.medication_reminder_minutes_before, 15)
 
 	def test_non_patient_cannot_access_reminder_preferences(self):
 		self.client.force_authenticate(user=self.caregiver_user)

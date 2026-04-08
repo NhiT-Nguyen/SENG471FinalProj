@@ -15,6 +15,11 @@ class NotificationSettingsSerializer(serializers.ModelSerializer):
             'appointment_reminder_sms',
             'appointment_reminder_push',
             'appointment_reminder_hours_before',
+            'medication_reminder_enabled',
+            'medication_reminder_email',
+            'medication_reminder_sms',
+            'medication_reminder_push',
+            'medication_reminder_minutes_before',
         ]
         read_only_fields = ['id', 'user']
 
