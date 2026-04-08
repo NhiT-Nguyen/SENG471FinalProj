@@ -18,12 +18,12 @@ class MedicationViewSet(viewsets.ModelViewSet):
             # Healthcare providers can see medications they prescribed
             provider = getattr(user, 'healthcare_provider_profile', None)
             if provider:
-                return Medication.objects.filter(prescribed_by=provider)
+                return Medication.objects.filter(prescribed_by=provider).order_by('-prescribed_date')
         elif profile and profile.role == 'patient':
             # Patients can see their own medications
             patient = getattr(user, 'patient_profile', None)
             if patient:
-                return Medication.objects.filter(patient=patient)
+                return Medication.objects.filter(patient=patient).order_by('-prescribed_date')
         elif profile and profile.role in ['caregiver', 'family_member']:
             # Caregivers and family members can see medications for their patients
             patient_ids = []
@@ -31,7 +31,7 @@ class MedicationViewSet(viewsets.ModelViewSet):
                 patient_ids = list(user.patients.values_list('id', flat=True))
             elif profile.role == 'family_member':
                 patient_ids = list(user.family_patients.values_list('id', flat=True))
-            return Medication.objects.filter(patient_id__in=patient_ids)
+            return Medication.objects.filter(patient_id__in=patient_ids).order_by('-prescribed_date')
         return Medication.objects.none()
 
     def perform_create(self, serializer):
