@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -86,3 +86,19 @@ class MedicationViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         
         return Response({"detail": "Not authorized to view medications."}, status=status.HTTP_403_FORBIDDEN)
+
+    @action(detail=True, methods=['post'])
+    def discontinue(self, request, pk=None):
+        """Mark a medication as discontinued (healthcare providers only)."""
+        medication = self.get_object()
+        user = request.user
+        profile = getattr(user, 'profile', None)
+        if not profile or profile.role != 'healthcare_provider':
+            return Response(
+                {"detail": "Only healthcare providers can discontinue medications."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        medication.status = 'discontinued'
+        medication.save()
+        serializer = self.get_serializer(medication)
+        return Response(serializer.data)
