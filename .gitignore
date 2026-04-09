@@ -1,6 +1,10 @@
 *.pyc
 react-frontend/node_modules
 react-frontend/dist
+react-frontend/.vite
 venv
 ./venv
+react-frontend/.env
+.DS_Store
+__pycache__/
 
