@@ -2,10 +2,11 @@ import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../hooks/useToast'
+import loginPhoto    from '../static/login.png'
+import logoWithName  from '../static/logowithname.png'
 
 export default function LoginPage() {
   const { login } = useAuth()
-  const { toast } = useToast ? { toast: null } : {}
   const t = useToast()
   const navigate = useNavigate()
   const [form, setForm] = useState({ username: '', password: '' })
@@ -21,7 +22,7 @@ export default function LoginPage() {
       t?.success('Welcome back!')
       navigate('/')
     } catch (err) {
-      setError(err.message || 'Login failed')
+      setError(err.message || 'Invalid username or password')
     } finally {
       setLoading(false)
     }
@@ -29,55 +30,171 @@ export default function LoginPage() {
 
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #dbeafe 0%, #f0fdf4 100%)', padding: 20,
+      minHeight: '100vh',
+      display: 'flex',
+      background: '#f8f9fc',
     }}>
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 14, background: 'var(--primary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px',
+      {/* Left panel — photo + brand */}
+      <div
+        className="auth-left-panel"
+        style={{
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-end',
+        }}
+      >
+        {/* Background photo */}
+        <img
+          src={loginPhoto}
+          alt=""
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center 20%',
+          }}
+        />
+
+        {/* Gradient overlay — bottom-heavy for text legibility */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(to bottom, rgba(8,18,38,0.25) 0%, rgba(8,18,38,0.72) 60%, rgba(8,18,38,0.92) 100%)',
+        }} />
+
+        {/* Top-left logo — frosted glass pill so logo is legible on any photo */}
+        <div style={{
+          position: 'absolute', top: 28, left: 32,
+          background: 'rgba(255,255,255,0.18)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 10,
+          border: '1px solid rgba(255,255,255,0.25)',
+          padding: '6px 14px 6px 10px',
+          display: 'inline-flex', alignItems: 'center',
+        }}>
+          <img src={logoWithName} alt="AegisCare" style={{ height: 26, objectFit: 'contain' }} />
+        </div>
+
+        {/* Bottom content */}
+        <div style={{ position: 'relative', padding: '40px 44px 48px', color: 'white' }}>
+          <h1 style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: 38,
+            fontWeight: 400,
+            lineHeight: 1.2,
+            marginBottom: 14,
+            letterSpacing: '-0.01em',
           }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12 2l9 4.5v9L12 22l-9-6.5v-9L12 2z"/></svg>
-          </div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--gray-900)' }}>Healthcare Platform</h1>
-          <p style={{ color: 'var(--gray-500)', fontSize: 14, marginTop: 4 }}>Sign in to your account</p>
-        </div>
+            Coordinated care,<br />
+            <em>simplified.</em>
+          </h1>
+          <p style={{
+            fontSize: 14,
+            lineHeight: 1.7,
+            opacity: 0.82,
+            maxWidth: 380,
+            fontWeight: 400,
+          }}>
+            Connect patients, caregivers, family members and healthcare providers
+            in one secure, trusted platform.
+          </p>
 
-        <div className="card">
-          <div className="card-body">
-            {error && <div className="alert alert-error">{error}</div>}
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label className="form-label">Username</label>
-                <input
-                  className="form-control" type="text" value={form.username} placeholder="Enter username"
-                  onChange={e => setForm(f => ({ ...f, username: e.target.value }))} required
-                />
-              </div>
-              <div className="form-group" style={{ marginBottom: 20 }}>
-                <label className="form-label">Password</label>
-                <input
-                  className="form-control" type="password" value={form.password} placeholder="Enter password"
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required
-                />
-              </div>
-              <button type="submit" className="btn btn-primary w-full btn-lg" disabled={loading}>
-                {loading ? <><span className="spinner" style={{ width: 16, height: 16 }} /> Signing in…</> : 'Sign In'}
-              </button>
-            </form>
-          </div>
         </div>
-
-        <p style={{ textAlign: 'center', marginTop: 16, fontSize: 14, color: 'var(--gray-600)' }}>
-          Don't have an account?{' '}
-          <Link to="/register" style={{ color: 'var(--primary)', fontWeight: 500 }}>Register</Link>
-        </p>
-        <p style={{ textAlign: 'center', marginTop: 8, fontSize: 13, color: 'var(--gray-400)' }}>
-          Need test data? <Link to="/simulator" style={{ color: 'var(--gray-500)' }}>Use the Simulator</Link>
-        </p>
       </div>
+
+      {/* Right panel — form */}
+      <div style={{
+        width: 480,
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        padding: '52px 52px',
+        background: 'var(--white)',
+        boxShadow: '-12px 0 40px rgba(0,0,0,.07)',
+      }}>
+        {/* Mobile-only logo */}
+        <div className="auth-mobile-logo" style={{ display: 'none', marginBottom: 32 }}>
+          <img src={logoWithName} alt="AegisCare" style={{ height: 28, objectFit: 'contain' }} />
+        </div>
+
+        <div style={{ marginBottom: 36 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+            Secure Sign-In
+          </div>
+          <h2 style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: 28,
+            fontWeight: 400,
+            color: 'var(--gray-900)',
+            letterSpacing: '-0.01em',
+            lineHeight: 1.2,
+          }}>
+            Welcome back
+          </h2>
+          <p style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: 6, lineHeight: 1.6 }}>
+            Enter your credentials to access your account
+          </p>
+        </div>
+
+        {error && (
+          <div className="alert alert-error" style={{ marginBottom: 20 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">Username</label>
+            <input
+              className="form-control"
+              type="text"
+              value={form.username}
+              placeholder="Enter your username"
+              onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+              autoComplete="username"
+              required
+            />
+          </div>
+          <div className="form-group" style={{ marginBottom: 28 }}>
+            <label className="form-label">Password</label>
+            <input
+              className="form-control"
+              type="password"
+              value={form.password}
+              placeholder="Enter your password"
+              onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+              autoComplete="current-password"
+              required
+            />
+          </div>
+          <button type="submit" className="btn btn-primary w-full btn-lg" disabled={loading} style={{ borderRadius: 10, fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>
+            {loading
+              ? <><span className="spinner" style={{ borderTopColor: 'rgba(255,255,255,.9)', borderColor: 'rgba(255,255,255,.3)' }} /> Signing in…</>
+              : 'Sign In'}
+          </button>
+        </form>
+
+        <div style={{ marginTop: 22, fontSize: 13, color: 'var(--gray-500)', textAlign: 'center' }}>
+          Don't have an account?{' '}
+          <Link to="/register" style={{ color: 'var(--primary)', fontWeight: 600 }}>Create account</Link>
+        </div>
+
+      </div>
+
+      <style>{`
+        @media (max-width: 860px) { .auth-left-panel { display: none !important; } }
+        @media (max-width: 860px) { .auth-mobile-logo { display: flex !important; } }
+      `}</style>
     </div>
   )
 }
+
