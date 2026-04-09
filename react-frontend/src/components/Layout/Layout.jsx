@@ -13,41 +13,63 @@ export default function Layout() {
     if (!loading && !token) navigate('/login')
   }, [loading, token, navigate])
 
+  // Close sidebar on route change
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [location.pathname])
+
   if (loading) return (
-    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="spinner" style={{ width: 40, height: 40 }} />
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+      <div className="spinner" style={{ width: 32, height: 32 }} />
+      <span style={{ fontSize: 13, color: 'var(--gray-400)' }}>Loading…</span>
     </div>
   )
 
   if (!token) return null
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      {/* Mobile overlay */}
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--gray-50)' }}>
+
+      {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 99 }}
           onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(10,15,26,.4)',
+            backdropFilter: 'blur(2px)',
+            zIndex: 90,
+          }}
         />
       )}
 
-      {/* Sidebar */}
-      <div style={{
-        position: 'fixed', left: sidebarOpen ? 0 : '-260px', top: 0, bottom: 0, zIndex: 100,
-        transition: 'left .2s', display: 'block',
-      }} className="sidebar-mobile">
-        <Sidebar onClose={() => setSidebarOpen(false)} />
-      </div>
-
       {/* Desktop sidebar */}
-      <div className="sidebar-desktop">
+      <div className="sidebar-desktop" style={{ flexShrink: 0 }}>
         <Sidebar />
       </div>
 
-      {/* Main */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Mobile sidebar — slides in */}
+      <div
+        className="sidebar-mobile"
+        style={{
+          position: 'fixed', top: 0, bottom: 0, left: 0,
+          zIndex: 100,
+          transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform .22s cubic-bezier(.4,0,.2,1)',
+        }}
+      >
+        <Sidebar onClose={() => setSidebarOpen(false)} />
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <TopBar onMenuClick={() => setSidebarOpen(true)} />
-        <main style={{ flex: 1, overflowY: 'auto', padding: '24px', background: 'var(--gray-50)' }}>
+        <main style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '28px 28px',
+          background: 'var(--gray-50)',
+        }}>
           <Outlet />
         </main>
       </div>
@@ -59,7 +81,7 @@ export default function Layout() {
         }
         @media (max-width: 767px) {
           .sidebar-desktop { display: none; }
-          .sidebar-mobile { display: block !important; left: ${sidebarOpen ? '0' : '-260px'} !important; }
+          .sidebar-mobile { display: block; }
         }
       `}</style>
     </div>
