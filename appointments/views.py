@@ -139,14 +139,20 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
     queryset = Availability.objects.all()
     serializer_class = AvailabilitySerializer
 
+    def perform_create(self, serializer):
+        """Auto-set healthcare_provider from the logged-in user."""
+        serializer.save(healthcare_provider=self.request.user)
+
     @action(detail=False, methods=['get'])
     def provider_availability(self, request):
-        """Get availability slots for a specific provider"""
+        """Get availability slots for a provider.
+        Uses provider_id query param if given, otherwise uses the logged-in user."""
         provider_id = request.query_params.get('provider_id')
-        if not provider_id:
-            return Response({'error': 'provider_id required'}, status=status.HTTP_400_BAD_REQUEST)
-        availabilities = self.queryset.filter(healthcare_provider_id=provider_id, status='available')
-        serializer = AvailabilityWithProviderSerializer(availabilities, many=True)
+        if provider_id:
+            availabilities = self.queryset.filter(healthcare_provider_id=provider_id)
+        else:
+            availabilities = self.queryset.filter(healthcare_provider=request.user)
+        serializer = AvailabilitySerializer(availabilities, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])

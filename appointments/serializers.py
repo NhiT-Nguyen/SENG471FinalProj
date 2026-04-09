@@ -33,6 +33,7 @@ class AvailabilitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Availability
         fields = ['id', 'healthcare_provider', 'day_of_week', 'start_time', 'end_time', 'is_recurring', 'week_start_date', 'status', 'status_display', 'is_available']
+        read_only_fields = ['healthcare_provider']
 
 class AvailabilityWithProviderSerializer(serializers.ModelSerializer):
     provider_details = serializers.SerializerMethodField()
