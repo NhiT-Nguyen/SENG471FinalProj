@@ -1,1 +1,6 @@
 *.pyc
+react-frontend/node_modules
+react-frontend/dist
+venv
+./venv
+
