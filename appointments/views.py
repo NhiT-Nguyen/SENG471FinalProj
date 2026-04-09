@@ -262,13 +262,34 @@ class AppointmentRequestViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def request_appointment(self, request):
         """Create an appointment request"""
-        serializer = self.get_serializer(data=request.data)
+        data = request.data.copy()
+
+        # Auto-inject patient ID from the logged-in user if not provided
+        if 'patient' not in data or not data['patient']:
+            patient_obj = Patient.objects.filter(user=request.user).first()
+            if not patient_obj:
+                return Response(
+                    {'error': 'No patient record found for your account. Please complete patient registration.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            data['patient'] = patient_obj.id
+
+        # Auto-fill requested_end_time to 1 hour after start if not provided
+        if 'requested_end_time' not in data or not data['requested_end_time']:
+            start = data.get('requested_start_time')
+            if start:
+                from datetime import datetime, timedelta
+                try:
+                    t = datetime.strptime(start, '%H:%M').time()
+                    end_dt = datetime.combine(datetime.today(), t) + timedelta(hours=1)
+                    data['requested_end_time'] = end_dt.strftime('%H:%M')
+                except Exception:
+                    data['requested_end_time'] = start
+
+        serializer = self.get_serializer(data=data)
         if serializer.is_valid():
             appointment_request = serializer.save()
-            
-            # Update availability status to "appointment_request_pending"
             self._update_availability_on_request(appointment_request)
-            
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

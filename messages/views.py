@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
+from django.contrib.auth.models import User
 from .models import Message
 from .serializers import MessageSerializer
 from notifications.models import Alert
@@ -11,7 +12,24 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return Message.objects.filter(Q(sender=user) | Q(receiver=user))
+        return Message.objects.filter(Q(sender=user) | Q(receiver=user)).order_by('created_at')
+
+    def create(self, request, *args, **kwargs):
+        """Support sending by receiver_username or receiver (user id)."""
+        data = request.data.copy()
+        if 'receiver_username' in data and not data.get('receiver'):
+            username = data.pop('receiver_username')
+            if isinstance(username, list):
+                username = username[0]
+            try:
+                receiver = User.objects.get(username=username)
+                data['receiver'] = receiver.id
+            except User.DoesNotExist:
+                return Response({'error': f'User "{username}" not found'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
         message = serializer.save(sender=self.request.user)

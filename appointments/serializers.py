@@ -4,12 +4,15 @@ from authentication.serializers import HealthcareProviderDetailSerializer
 
 class AppointmentSerializer(serializers.ModelSerializer):
     provider_name = serializers.CharField(source='healthcare_provider.get_full_name', read_only=True)
+    provider_username = serializers.CharField(source='healthcare_provider.username', read_only=True)
     patient_name = serializers.CharField(source='patient.name', read_only=True)
+    patient_username = serializers.CharField(source='patient.user.username', read_only=True)
 
     class Meta:
         model = Appointment
         fields = [
-            'id', 'patient', 'patient_name', 'healthcare_provider', 'provider_name',
+            'id', 'patient', 'patient_name', 'patient_username',
+            'healthcare_provider', 'provider_name', 'provider_username',
             'date', 'time', 'duration',
             'notes', 'reasons_for_visit', 'examinations_performed', 'tests_requested',
             'new_medications', 'referrals', 'follow_up_recommended', 'location'
@@ -57,16 +60,19 @@ class AppointmentRequestSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     change_status_display = serializers.CharField(source='get_change_status_display', read_only=True)
     patient_name = serializers.CharField(source='patient.name', read_only=True)
+    patient_username = serializers.CharField(source='patient.user.username', read_only=True)
     provider_name = serializers.CharField(source='healthcare_provider.get_full_name', read_only=True)
+    provider_username = serializers.CharField(source='healthcare_provider.username', read_only=True)
 
     class Meta:
         model = AppointmentRequest
         fields = [
-            'id', 'patient', 'patient_name', 'healthcare_provider', 'provider_name',
+            'id', 'patient', 'patient_name', 'patient_username',
+            'healthcare_provider', 'provider_name', 'provider_username',
             'requested_date', 'requested_start_time', 'requested_end_time',
             'notes', 'status', 'status_display',
             'appointment', 'proposed_date', 'proposed_start_time', 'proposed_end_time', 'proposed_notes',
             'change_status', 'change_status_display', 'change_requested_at',
             'created_at', 'updated_at', 'resolved_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'resolved_at', 'patient_name', 'provider_name', 'change_status', 'change_status_display', 'change_requested_at', 'appointment']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'resolved_at', 'patient_name', 'patient_username', 'provider_name', 'provider_username', 'change_status', 'change_status_display', 'change_requested_at', 'appointment']

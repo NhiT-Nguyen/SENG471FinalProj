@@ -31,7 +31,8 @@ def register(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if password != password_confirm:
+    # Allow missing password_confirm for API clients that skip it
+    if password_confirm and password != password_confirm:
         return Response(
             {'error': 'Passwords do not match'},
             status=status.HTTP_400_BAD_REQUEST,
@@ -60,7 +61,34 @@ def register(request):
     Profile.objects.create(user=user, role=role)
 
     if role == 'healthcare_provider':
-        HealthcareProvider.objects.create(user=user)
+        specialty = data.get('specialty', 'general_practice')
+        # Map free-text specialties to valid choices
+        specialty_map = {
+            'cardiology': 'cardiology', 'neurology': 'neurology', 'pediatrics': 'pediatrics',
+            'orthopedics': 'orthopedics', 'dermatology': 'dermatology', 'psychiatry': 'psychiatry',
+            'radiology': 'radiology', 'emergency medicine': 'emergency_medicine', 'emergency_medicine': 'emergency_medicine',
+            'nursing': 'nursing', 'pharmacy': 'pharmacy', 'general practice': 'general_practice',
+            'general_practice': 'general_practice',
+        }
+        specialty_key = specialty_map.get(specialty.lower(), 'other')
+        HealthcareProvider.objects.create(
+            user=user,
+            specialty=specialty_key,
+            license_number=data.get('license_number', ''),
+            hospital_clinic=data.get('hospital_clinic_name', data.get('hospital_clinic', '')),
+            phone_number=data.get('phone_number', ''),
+            bio=data.get('bio', ''),
+            years_of_experience=data.get('years_of_experience', 0) or 0,
+        )
+
+    elif role == 'patient':
+        dob = data.get('date_of_birth', '1990-01-01') or '1990-01-01'
+        patient_name = f"{first_name} {last_name}".strip() or username
+        Patient.objects.create(
+            user=user,
+            name=patient_name,
+            date_of_birth=dob,
+        )
 
     token, _ = Token.objects.get_or_create(user=user)
     return Response(
