@@ -63,6 +63,8 @@ export const appointmentApi = {
   filterBySpecialty: (s)     => api.get(`/api/appointments/availabilities/filter_by_specialty/?specialty=${encodeURIComponent(s)}`),
   availableAtDatetime: (dt)  => api.get(`/api/appointments/availabilities/available_at_datetime/?datetime=${encodeURIComponent(dt)}`),
   createAvailability: (data) => api.post('/api/appointments/availabilities/', data),
+  updateAvailability: (id, data) => api.patch(`/api/appointments/availabilities/${id}/`, data),
+  deleteAvailability: (id)       => api.delete(`/api/appointments/availabilities/${id}/`),
 
   pendingConfirmations: ()   => api.get('/api/appointments/availability-confirmations/pending_confirmations/'),
   confirmAvailability: (id)  => api.post(`/api/appointments/availability-confirmations/${id}/confirm/`, {}),
@@ -104,6 +106,7 @@ export const notificationApi = {
   alerts:         ()     => api.get('/api/notifications/alerts/'),
   createAlert:    (data) => api.post('/api/notifications/alerts/', data),
   markRead:       (id)   => api.post(`/api/notifications/alerts/${id}/mark_as_read/`, {}),
+  deleteAlert:    (id)   => api.delete(`/api/notifications/alerts/${id}/`),
 }
 
 // Medical History
@@ -112,6 +115,7 @@ export const medicalApi = {
   byType:         (type)  => api.get(`/api/medical-history/records/by_type/?type=${encodeURIComponent(type)}`),
   recent:         ()      => api.get('/api/medical-history/records/recent/'),
   createRecord:   (data)  => api.post('/api/medical-history/records/', data),
+  deleteRecord:   (id)    => api.delete(`/api/medical-history/records/${id}/`),
   summary:        ()      => api.get('/api/medical-history/summary/'),
   myHistory:      ()      => api.get('/api/medical-history/history/my_history/'),
   patientHistory: (id)    => api.get(`/api/medical-history/history/patient_history/?patient_id=${id}`),
