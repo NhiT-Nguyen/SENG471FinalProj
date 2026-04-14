@@ -240,7 +240,7 @@ class AvailabilityConfirmationViewSet(viewsets.ModelViewSet):
     def pending_confirmations(self, request):
         provider_id = request.query_params.get('provider_id')
         if not provider_id:
-            return Response({'error': 'provider_id required'}, status=status.HTTP_400_BAD_REQUEST)
+            provider_id = request.user.id
         today = timezone.now().date()
         week_start = today - timedelta(days=today.weekday())
         pending = self.queryset.filter(
