@@ -7,4 +7,4 @@ venv
 react-frontend/.env
 .DS_Store
 __pycache__/
-
+.venv

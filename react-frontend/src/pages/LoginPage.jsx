@@ -68,20 +68,6 @@ export default function LoginPage() {
           background: 'linear-gradient(to bottom, rgba(8,18,38,0.25) 0%, rgba(8,18,38,0.72) 60%, rgba(8,18,38,0.92) 100%)',
         }} />
 
-        {/* Top-left logo — frosted glass pill so logo is legible on any photo */}
-        <div style={{
-          position: 'absolute', top: 28, left: 32,
-          background: 'rgba(255,255,255,0.18)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderRadius: 10,
-          border: '1px solid rgba(255,255,255,0.25)',
-          padding: '6px 14px 6px 10px',
-          display: 'inline-flex', alignItems: 'center',
-        }}>
-          <img src={logoWithName} alt="AegisCare" style={{ height: 26, objectFit: 'contain' }} />
-        </div>
-
         {/* Bottom content */}
         <div style={{ position: 'relative', padding: '40px 44px 48px', color: 'white' }}>
           <h1 style={{
@@ -120,6 +106,10 @@ export default function LoginPage() {
         background: 'var(--white)',
         boxShadow: '-12px 0 40px rgba(0,0,0,.07)',
       }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24, paddingRight: 115}}>
+          <img src={logoWithName} alt="AegisCare" style={{ height: 48, objectFit: 'contain' }} />
+        </div>
+
         {/* Mobile-only logo */}
         <div className="auth-mobile-logo" style={{ display: 'none', marginBottom: 32 }}>
           <img src={logoWithName} alt="AegisCare" style={{ height: 28, objectFit: 'contain' }} />
@@ -197,4 +187,3 @@ export default function LoginPage() {
     </div>
   )
 }
-
